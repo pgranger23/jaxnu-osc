@@ -37,6 +37,27 @@ evaluations for finite differences), and the same code runs batched on GPU/TPU.
 
 ---
 
+## Showcase: oscillograds
+
+An *oscillograd* ([arXiv:2512.16427](https://arxiv.org/abs/2512.16427)) is a map of
+the **gradient** of an oscillation probability with respect to a parameter,
+`∂P/∂ζ` — it shows where in parameter space a probability is most sensitive to ζ.
+This is exactly what a differentiable simulator is for: `jax.jacrev` returns the
+oscillograd for *every* parameter in a single reverse-mode pass.
+
+![atmospheric oscillograds](examples/oscillograds_atm.jpg)
+
+*Atmospheric oscillograds of `P(νμ→νe)` through the PREM Earth: the probability and
+its exact derivatives w.r.t. δ_CP, θ₂₃, θ₁₃ and Δm²₃₁ over (E, cos θ_z). θ₁₃ drives
+the MSW resonance (~6 GeV), θ₂₃ sets the appearance amplitude, δ_CP sensitivity sits
+at low energy — and the core–mantle boundary at cos θ_z ≈ −0.84 is visible in the
+gradients. Computed through fully differentiable matter propagation.*
+
+[`examples/oscillograds.py`](examples/oscillograds.py) generates these (and the
+DUNE-baseline constant-density version, paper-style) and verifies every gradient
+against central finite differences — agreement is **~1e−9** (constant density) and
+**~1e−8** (PREM Earth), for all six parameters.
+
 ## Installation
 
 ```bash
