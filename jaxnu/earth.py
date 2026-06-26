@@ -117,7 +117,8 @@ def _d(r2_minus_rmin2):
     return jnp.where(big, jnp.sqrt(x_safe), 0.0)
 
 
-def chord_segments(cz, table: ShellTable, h_atm_km=0.0, det_depth_km=0.0):
+def chord_segments(cz, table: ShellTable, h_atm_km=0.0, det_depth_km=0.0,
+                   ye_core=YE_CORE_DEFAULT, ye_mantle=YE_MANTLE_DEFAULT):
     """Path segments along the neutrino trajectory for ``cos(zenith) = cz``.
 
     Unified geometry covering the full range of ``cz``: up-going through the Earth,
@@ -125,7 +126,13 @@ def chord_segments(cz, table: ShellTable, h_atm_km=0.0, det_depth_km=0.0):
     (neutrinos produced at ``R_E + h_atm``, giving a vacuum baseline for
     down-going / near-horizon directions). PREM shell boundaries are respected
     exactly (no density smearing). Returns ``(rho, ye, length_km)`` of fixed length
-    ``2 * n_shells + 1`` ordered source -> detector; differentiable in ``cz``.
+    ``2 * n_shells + 1`` ordered source -> detector.
+
+    Differentiable in ``cz`` *and* in ``ye_core`` / ``ye_mantle`` (the two-zone
+    electron fraction, boundary at ``CORE_RADIUS_KM``): these are read here as
+    (possibly traced) JAX values, so ``d/d(ye_core)`` flows through -- e.g. for a
+    core electron-density oscillograd. (PREM mass density and shell-boundary radii
+    are still static constants.)
 
     Geometry uses the distance-from-closest-approach coordinate
     ``d(r) = sqrt(r^2 - r_min^2)`` with ``r_min = r_det*sqrt(1-cz^2)``. The
@@ -137,7 +144,6 @@ def chord_segments(cz, table: ShellTable, h_atm_km=0.0, det_depth_km=0.0):
     r_prod = R_EARTH_KM + h_atm_km
     outer = jnp.asarray(table.outer)
     inner = jnp.asarray(table.inner)
-    ye = jnp.asarray(table.ye)  # two-zone, constant within a shell
 
     cz = jnp.asarray(cz, dtype=jnp.float64)
     upgoing = cz < 0.0
@@ -150,18 +156,23 @@ def chord_segments(cz, table: ShellTable, h_atm_km=0.0, det_depth_km=0.0):
     d_in = _d(inner**2 - rmin2)
     sdet_abs = jnp.abs(s_det)
 
+    def ye_at(r):  # two-zone electron fraction (traced in ye_core/ye_mantle)
+        return jnp.where(r < CORE_RADIUS_KM, ye_core, ye_mantle)
+
     # Per-leg clamped d-ranges -> segment lengths and path-midpoint radii.  Sampling
     # density at the *path* midpoint (not the shell's geometric midpoint) makes the
     # constant-per-segment approximation converge far faster in n_sub (NuFast-style).
     d_hi_desc = jnp.clip(d_out, d_low, s_prod)
     d_lo_desc = jnp.clip(d_in, d_low, s_prod)
     len_desc = d_hi_desc - d_lo_desc
-    rho_desc = prem_density_jax(jnp.sqrt(rmin2 + (0.5 * (d_hi_desc + d_lo_desc)) ** 2))
+    r_desc = jnp.sqrt(rmin2 + (0.5 * (d_hi_desc + d_lo_desc)) ** 2)
+    rho_desc = prem_density_jax(r_desc)
 
     d_hi_asc = jnp.clip(d_out, 0.0, sdet_abs)
     d_lo_asc = jnp.clip(d_in, 0.0, sdet_abs)
     len_asc = jnp.where(upgoing, d_hi_asc - d_lo_asc, 0.0)
-    rho_asc = prem_density_jax(jnp.sqrt(rmin2 + (0.5 * (d_hi_asc + d_lo_asc)) ** 2))
+    r_asc = jnp.sqrt(rmin2 + (0.5 * (d_hi_asc + d_lo_asc)) ** 2)
+    rho_asc = prem_density_jax(r_asc)
 
     # Atmospheric vacuum segment: descending part with radius in [R_E, r_prod].
     d_re = _d(R_EARTH_KM**2 - rmin2)
@@ -171,7 +182,7 @@ def chord_segments(cz, table: ShellTable, h_atm_km=0.0, det_depth_km=0.0):
     one = jnp.ones((1,))
     lengths = jnp.concatenate([len_atm[None], len_desc[::-1], len_asc])
     rho_seg = jnp.concatenate([0.0 * one, rho_desc[::-1], rho_asc])
-    ye_seg = jnp.concatenate([YE_MANTLE_DEFAULT * one, ye[::-1], ye])
+    ye_seg = jnp.concatenate([ye_mantle * one, ye_at(r_desc)[::-1], ye_at(r_asc)])
     return rho_seg, ye_seg, lengths
 
 

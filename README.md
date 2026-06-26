@@ -58,6 +58,18 @@ DUNE-baseline constant-density version, paper-style) and verifies every gradient
 against central finite differences — agreement is **~1e−9** (constant density) and
 **~1e−8** (PREM Earth), for all six parameters.
 
+You can also differentiate w.r.t. the **Earth model** itself — the two-zone electron
+fraction `Y_e` (∝ electron density `N_e = ρ Y_e N_A`) is a traced input of
+`probability_earth(..., ye_core=, ye_mantle=)`:
+
+![core electron-density oscillograds](examples/oscillograds_density.jpg)
+
+*`∂P/∂Y_e^core` (center) is **exactly zero** for mantle-only trajectories and turns
+on only below the core-crossing threshold cos θ_z ≈ −0.84 — the autodiff gradient
+correctly "knows" the chord geometry — while `∂P/∂Y_e^mantle` (right) is non-zero for
+all up-going paths. (PREM mass-density polynomials and shell-boundary radii remain
+static constants; the matter potential `V ∝ ρ·Y_e` is differentiable in `Y_e`.)*
+
 ## Installation
 
 ```bash

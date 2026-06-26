@@ -164,3 +164,47 @@ fig.suptitle(r"Atmospheric oscillograds, $\nu_\mu\to\nu_e$ through the PREM Eart
              r"(differentiable matter propagation)", fontsize=13)
 fig.savefig(OUT / "oscillograds_atm.jpg", dpi=130)
 print("saved", OUT / "oscillograds_atm.jpg")
+
+
+# --- Electron-density oscillograds: d/d(Y_e) of the core vs the mantle ---------
+# Y_e sets the electron density N_e = rho * Y_e * N_A, so dP/d(Y_e^core) is the
+# sensitivity to the core electron density (at fixed mass density). It must vanish
+# for mantle-only paths and turn on only where the chord crosses the core
+# (cos theta_z < -0.838, i.e. closest approach below the 3480 km core radius).
+YE_CORE0, YE_MANTLE0 = 0.466, 0.494
+cz_core = -np.sqrt(1.0 - (jaxnu.earth.CORE_RADIUS_KM / jaxnu.earth.R_EARTH_KM) ** 2)
+
+
+def density_grids(E, cz):
+    def cell(e, c):
+        def P(yc, ym):
+            return probability_earth(BASE, e, c, n_sub=3, ye_core=yc, ye_mantle=ym,
+                                     flavor_in=Flavor.MU, flavor_out=Flavor.E)
+        val = P(YE_CORE0, YE_MANTLE0)
+        g_core = jax.grad(P, argnums=0)(YE_CORE0, YE_MANTLE0)
+        g_mantle = jax.grad(P, argnums=1)(YE_CORE0, YE_MANTLE0)
+        return val, g_core, g_mantle
+    f = jax.jit(lambda E, cz: jax.vmap(lambda c: jax.vmap(lambda e: cell(e, c))(E))(cz))
+    return f(E, cz)
+
+P3, gcore, gmant = (np.array(a) for a in density_grids(jnp.asarray(E2), jnp.asarray(cz)))
+fig, axs = plt.subplots(1, 3, figsize=(14, 3.8), dpi=130, constrained_layout=True)
+_panel(axs[0], E2, cz, P3, r"$P(\nu_\mu\to\nu_e)$", diverging=False)
+_panel(axs[1], E2, cz, gcore, r"$\partial P/\partial Y_e^{\rm core}$ (core electron density)")
+_panel(axs[2], E2, cz, gmant, r"$\partial P/\partial Y_e^{\rm mantle}$")
+for ax in (axs[1], axs[2]):
+    ax.axhline(cz_core, color="k", ls="--", lw=0.8)  # core-crossing threshold
+for ax in axs:
+    ax.set_xscale("log")
+    ax.set_xlabel(r"$E_\nu$ [GeV]")
+axs[0].set_ylabel(r"$\cos\theta_z$")
+fig.suptitle(r"Electron-density oscillograds: $\partial P/\partial Y_e$ for the core "
+             r"vs the mantle (dashed = core-crossing threshold $\cos\theta_z\approx-0.84$)",
+             fontsize=12)
+fig.savefig(OUT / "oscillograds_density.jpg", dpi=130)
+print("saved", OUT / "oscillograds_density.jpg")
+print(f"\ncore-crossing threshold cos(theta_z) = {cz_core:.4f}")
+print(f"max |dP/dYe_core| for mantle-only paths (cz > {cz_core:.3f}): "
+      f"{np.max(np.abs(gcore[cz > cz_core])):.2e}  (should be ~0)")
+print(f"max |dP/dYe_core| for core-crossing paths (cz < {cz_core:.3f}): "
+      f"{np.max(np.abs(gcore[cz < cz_core])):.2e}")

@@ -42,6 +42,23 @@ def test_ye_configurable_changes_result():
     assert float(jnp.max(jnp.abs(a - b))) > 1e-3
 
 
+def test_ye_core_differentiable_and_geometrically_localized():
+    import jax
+    p = nufit_no()
+    yc0 = jnp.asarray(0.466)
+    f = lambda yc, c: probability_earth(p, jnp.asarray(6.0), jnp.asarray(c),
+                                        ye_core=yc, flavor_in=Flavor.MU,
+                                        flavor_out=Flavor.E)
+    # core-crossing path: gradient is non-trivial and matches finite differences
+    ad = float(jax.grad(lambda yc: f(yc, -1.0))(yc0))
+    h = 1e-6
+    fd = (float(f(yc0 + h, -1.0)) - float(f(yc0 - h, -1.0))) / (2 * h)
+    assert abs(ad) > 1e-2 and abs(ad - fd) < 1e-4 * (1.0 + abs(fd))
+    # mantle-only path (cos z = -0.3, closest approach above the 3480 km core):
+    # the gradient w.r.t. the *core* electron fraction is exactly zero.
+    assert abs(float(jax.grad(lambda yc: f(yc, -0.3))(yc0))) < 1e-12
+
+
 def test_solar_adiabatic_unitarity_and_lma():
     p = nufit_no()
     prof = solar.exponential_profile()  # no external data needed

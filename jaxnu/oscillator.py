@@ -192,7 +192,7 @@ def probability_earth(params, energy_GeV, cos_zenith, det_depth_km=0.0,
     the detector depth below the surface.  ``nsi`` and sterile ``params`` are
     supported (sterile flavors feel the relative NC potential).
     """
-    table = _earth.shell_table(n_sub, ye_core=ye_core, ye_mantle=ye_mantle)
+    table = _earth.shell_table(n_sub)  # static geometry (boundaries); Y_e set below
     u, msq = params.pmns(), params.msquared()
     na = _n_active(params)
     nsi_mat = _nsi_matrix(nsi, na)
@@ -200,7 +200,8 @@ def probability_earth(params, energy_GeV, cos_zenith, det_depth_km=0.0,
 
     def core(e_eV, cz):
         rho, ye, length_km = _earth.chord_segments(
-            cz, table, h_atm_km=h_atm_km, det_depth_km=det_depth_km)
+            cz, table, h_atm_km=h_atm_km, det_depth_km=det_depth_km,
+            ye_core=ye_core, ye_mantle=ye_mantle)
         v_cc, v_nc = C.matter_potentials(rho, ye)
         length_invEV = length_km * C.KM_TO_INV_EV
         s = propagate_layers(u, msq, e_eV, v_cc, length_invEV, anti=anti,
