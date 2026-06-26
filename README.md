@@ -332,6 +332,32 @@ jaxnu/
   [nu-waves](https://github.com/nadrino/nu-waves) reference plots.
 - Solar profile: Bahcall, Serenelli & Basu, BS05(AGS,OP) standard solar model.
 
+## Releasing to PyPI
+
+Publishing is automated via GitHub Actions
+([`.github/workflows/publish.yml`](.github/workflows/publish.yml)) using PyPI
+**trusted publishing** (OIDC) — no API tokens or secrets.
+
+**One-time setup** (on [pypi.org](https://pypi.org), needs your PyPI login). Account
+→ *Publishing* → *Add a pending publisher* with:
+
+| field | value |
+|-------|-------|
+| PyPI Project Name | `jaxnu` |
+| Owner | `pgranger23` |
+| Repository name | `jaxnu-osc` |
+| Workflow name | `publish.yml` |
+| Environment name | `pypi` |
+
+**To cut a release:**
+
+1. Bump the version in `pyproject.toml` **and** `jaxnu/__init__.py`, commit, push.
+2. Tag and publish a GitHub Release: e.g. `git tag v0.1.0 && git push origin v0.1.0`,
+   then create a Release for that tag (or `gh release create v0.1.0 --generate-notes`).
+3. The workflow builds the sdist + wheel and publishes to PyPI → `pip install jaxnu`.
+
+(You can dry-run the build locally with `python -m build && twine check dist/*`.)
+
 ## License
 
 MIT — see [LICENSE](LICENSE).
