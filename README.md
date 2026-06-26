@@ -1,5 +1,8 @@
 # jaxnu
 
+[![CI](https://github.com/pgranger23/jaxnu-osc/actions/workflows/ci.yml/badge.svg)](https://github.com/pgranger23/jaxnu-osc/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 **A differentiable neutrino oscillation calculator in [JAX](https://docs.jax.dev).**
 
 `jaxnu` computes neutrino oscillation probabilities in **vacuum**, **constant-density
