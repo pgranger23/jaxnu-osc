@@ -67,8 +67,26 @@ fraction `Y_e` (∝ electron density `N_e = ρ Y_e N_A`) is a traced input of
 *`∂P/∂Y_e^core` (center) is **exactly zero** for mantle-only trajectories and turns
 on only below the core-crossing threshold cos θ_z ≈ −0.84 — the autodiff gradient
 correctly "knows" the chord geometry — while `∂P/∂Y_e^mantle` (right) is non-zero for
-all up-going paths. (PREM mass-density polynomials and shell-boundary radii remain
-static constants; the matter potential `V ∝ ρ·Y_e` is differentiable in `Y_e`.)*
+all up-going paths.*
+
+For full control, a parametric `LayeredEarth` makes the **shell boundary radii**,
+**densities** and **Y_e** all differentiable inputs:
+
+```python
+model = jaxnu.prem_layered(n_sub=3)   # constant-density-shell Earth sampled from PREM
+P = jaxnu.probability_earth(params, E, cz, earth_model=model)
+jac = jax.jacrev(lambda m: jaxnu.probability_earth(params, E, cz, earth_model=m,
+                          flavor_in=Flavor.MU, flavor_out=Flavor.E))(model)
+# jac.outer -> dP/d(boundary radii), jac.density -> dP/d(shell densities), jac.ye -> ...
+```
+
+![Earth-model oscillograds](examples/oscillograds_earth_model.jpg)
+
+*Differentiating w.r.t. the Earth structure itself: `∂P/∂R_cmb` (the core–mantle
+boundary position, center) and `∂P/∂ρ` for a deep core shell at 1735 km (right).
+Each is non-zero **only for trajectories that reach that radius** — the boundary
+sensitivity below cos θ_z ≈ −0.84, the 1735 km shell only below ≈ −0.96 — so the
+gradients exactly trace the radial geometry. (Matches finite differences to ~1e−8.)*
 
 ## Installation
 

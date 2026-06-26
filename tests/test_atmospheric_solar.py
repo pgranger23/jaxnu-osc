@@ -59,6 +59,36 @@ def test_ye_core_differentiable_and_geometrically_localized():
     assert abs(float(jax.grad(lambda yc: f(yc, -0.3))(yc0))) < 1e-12
 
 
+def test_layered_earth_matches_prem_and_is_differentiable():
+    import dataclasses
+    import jax
+    from jaxnu import prem_layered
+    p = nufit_no()
+    model = prem_layered(n_sub=3)
+    # sanity: constant-shell layered model ~ PREM-polynomial path
+    a = float(probability_earth(p, jnp.asarray(6.0), jnp.asarray(-1.0),
+                                earth_model=model, flavor_in=Flavor.MU,
+                                flavor_out=Flavor.E))
+    b = float(probability_earth(p, jnp.asarray(6.0), jnp.asarray(-1.0), n_sub=3,
+                                ye_core=0.4656, ye_mantle=0.4957,
+                                flavor_in=Flavor.MU, flavor_out=Flavor.E))
+    assert abs(a - b) < 5e-3
+
+    Pme = lambda m: probability_earth(p, jnp.asarray(6.0), jnp.asarray(-1.0),
+                                      earth_model=m, flavor_in=Flavor.MU,
+                                      flavor_out=Flavor.E)
+    g = jax.grad(Pme)(model)
+    assert not bool(jnp.any(jnp.isnan(g.outer)) or jnp.any(jnp.isnan(g.density)))
+    # autodiff vs finite differences for a boundary radius and a shell density
+    k = len(model.outer) // 2
+    for field, h in [("outer", 1e-3), ("density", 1e-4)]:
+        ad = float(getattr(g, field)[k])
+        up = dataclasses.replace(model, **{field: getattr(model, field).at[k].add(h)})
+        dn = dataclasses.replace(model, **{field: getattr(model, field).at[k].add(-h)})
+        fd = (float(Pme(up)) - float(Pme(dn))) / (2 * h)
+        assert abs(ad - fd) < 1e-5 * (1.0 + abs(fd)), (field, ad, fd)
+
+
 def test_solar_adiabatic_unitarity_and_lma():
     p = nufit_no()
     prof = solar.exponential_profile()  # no external data needed

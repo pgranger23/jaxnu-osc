@@ -175,8 +175,8 @@ def _grid_eval(core, energy_eV, cz):
 
 def probability_earth(params, energy_GeV, cos_zenith, det_depth_km=0.0,
                       n_sub=4, h_atm_km=0.0, ye_core=_earth.YE_CORE_DEFAULT,
-                      ye_mantle=_earth.YE_MANTLE_DEFAULT, anti=False,
-                      backend="cayley", nsi=None,
+                      ye_mantle=_earth.YE_MANTLE_DEFAULT, earth_model=None,
+                      anti=False, backend="cayley", nsi=None,
                       flavor_in=None, flavor_out=None):
     """Oscillation probabilities through the PREM Earth (and atmosphere).
 
@@ -191,17 +191,28 @@ def probability_earth(params, energy_GeV, cos_zenith, det_depth_km=0.0,
     set the two-zone electron fraction (boundary at 3480 km); ``det_depth_km`` is
     the detector depth below the surface.  ``nsi`` and sterile ``params`` are
     supported (sterile flavors feel the relative NC potential).
+
+    Pass ``earth_model`` (a :class:`jaxnu.earth.LayeredEarth`) to use a fully
+    parametric constant-density-shell Earth instead of the fixed PREM polynomials;
+    probabilities are then differentiable w.r.t. the **shell boundary radii**,
+    **densities** and **Y_e** (it overrides ``n_sub`` / ``ye_core`` / ``ye_mantle``).
     """
-    table = _earth.shell_table(n_sub)  # static geometry (boundaries); Y_e set below
     u, msq = params.pmns(), params.msquared()
     na = _n_active(params)
     nsi_mat = _nsi_matrix(nsi, na)
     backend = _resolve_backend(params, backend)
 
-    def core(e_eV, cz):
-        rho, ye, length_km = _earth.chord_segments(
+    if earth_model is None:
+        table = _earth.shell_table(n_sub)  # static boundaries; Y_e traced below
+        segments = lambda cz: _earth.chord_segments(
             cz, table, h_atm_km=h_atm_km, det_depth_km=det_depth_km,
             ye_core=ye_core, ye_mantle=ye_mantle)
+    else:
+        segments = lambda cz: _earth.layered_chord_segments(
+            earth_model, cz, h_atm_km=h_atm_km, det_depth_km=det_depth_km)
+
+    def core(e_eV, cz):
+        rho, ye, length_km = segments(cz)
         v_cc, v_nc = C.matter_potentials(rho, ye)
         length_invEV = length_km * C.KM_TO_INV_EV
         s = propagate_layers(u, msq, e_eV, v_cc, length_invEV, anti=anti,

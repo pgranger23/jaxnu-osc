@@ -14,9 +14,11 @@ propagators).  Lengths are smooth in ``cz`` (=> differentiable in zenith angle).
 
 from __future__ import annotations
 
+import dataclasses
 from collections import namedtuple
 
 import numpy as np
+import jax
 import jax.numpy as jnp
 
 from .constants import R_EARTH_KM
@@ -189,6 +191,80 @@ def chord_segments(cz, table: ShellTable, h_atm_km=0.0, det_depth_km=0.0,
 def earth_segments(cz, table: ShellTable, det_depth_km=0.0):
     """Earth-only path segments (``h_atm_km = 0``); see :func:`chord_segments`."""
     return chord_segments(cz, table, h_atm_km=0.0, det_depth_km=det_depth_km)
+
+
+# --- fully parametric, differentiable layered Earth --------------------------
+
+@jax.tree_util.register_dataclass
+@dataclasses.dataclass(frozen=True)
+class LayeredEarth:
+    """A constant-density-shell Earth whose parameters are differentiable.
+
+    ``outer`` : ascending outer radii of the shells (km), ``outer[-1]`` = surface.
+    ``density``: mass density of each shell (g/cm^3).
+    ``ye``    : electron fraction of each shell.
+
+    All three are JAX arrays (a PyTree), so probabilities are differentiable w.r.t.
+    the **shell boundary positions** *and* the **shell densities** / Y_e -- not just
+    the oscillation parameters. Build one from PREM with :func:`prem_layered`.
+    """
+
+    outer: jax.Array
+    density: jax.Array
+    ye: jax.Array
+
+
+def prem_layered(n_sub: int = 2, ye_core: float = YE_CORE_DEFAULT,
+                 ye_mantle: float = YE_MANTLE_DEFAULT) -> LayeredEarth:
+    """A :class:`LayeredEarth` sampling PREM into constant-density shells.
+
+    Uses the same thickness-proportional shell placement as :func:`shell_table`;
+    each shell's density is PREM at its mid radius. The result is a differentiable
+    approximation to PREM (exact as ``n_sub -> infinity``).
+    """
+    tab = shell_table(n_sub, ye_core=ye_core, ye_mantle=ye_mantle)
+    return LayeredEarth(outer=jnp.asarray(tab.outer),
+                        density=jnp.asarray(tab.rho),
+                        ye=jnp.asarray(tab.ye))
+
+
+def layered_chord_segments(model: LayeredEarth, cz, h_atm_km=0.0, det_depth_km=0.0):
+    """Path segments through a :class:`LayeredEarth` (cf. :func:`chord_segments`).
+
+    Differentiable in ``cz`` *and* in ``model.outer`` (boundary positions),
+    ``model.density`` and ``model.ye``. The surface radius is ``model.outer[-1]``.
+    Returns ``(rho, ye, length_km)`` of fixed length ``2 * n_shells + 1`` ordered
+    source -> detector.
+    """
+    outer = model.outer
+    inner = jnp.concatenate([jnp.zeros(1, outer.dtype), outer[:-1]])
+    density, ye = model.density, model.ye
+    r_e = outer[-1]
+    r_det = r_e - det_depth_km
+    r_prod = r_e + h_atm_km
+
+    cz = jnp.asarray(cz, dtype=jnp.float64)
+    upgoing = cz < 0.0
+    rmin2 = r_det**2 * jnp.clip(1.0 - cz**2, 0.0, None)
+    s_prod = _d(r_prod**2 - rmin2)
+    s_det = r_det * cz
+    d_low = jnp.where(upgoing, 0.0, s_det)
+
+    d_out = _d(outer**2 - rmin2)
+    d_in = _d(inner**2 - rmin2)
+    sdet_abs = jnp.abs(s_det)
+
+    len_desc = jnp.clip(d_out, d_low, s_prod) - jnp.clip(d_in, d_low, s_prod)
+    len_asc = jnp.where(
+        upgoing, jnp.clip(d_out, 0.0, sdet_abs) - jnp.clip(d_in, 0.0, sdet_abs), 0.0)
+    d_re = _d(r_e**2 - rmin2)
+    len_atm = s_prod - jnp.clip(d_re, d_low, s_prod)
+
+    one = jnp.ones((1,))
+    lengths = jnp.concatenate([len_atm[None], len_desc[::-1], len_asc])
+    rho_seg = jnp.concatenate([0.0 * one, density[::-1], density])
+    ye_seg = jnp.concatenate([ye[-1] * one, ye[::-1], ye])
+    return rho_seg, ye_seg, lengths
 
 
 def baseline_km(cz, det_depth_km=0.0):

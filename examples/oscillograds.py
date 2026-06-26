@@ -208,3 +208,48 @@ print(f"max |dP/dYe_core| for mantle-only paths (cz > {cz_core:.3f}): "
       f"{np.max(np.abs(gcore[cz > cz_core])):.2e}  (should be ~0)")
 print(f"max |dP/dYe_core| for core-crossing paths (cz < {cz_core:.3f}): "
       f"{np.max(np.abs(gcore[cz < cz_core])):.2e}")
+
+
+# --- Earth-model oscillograds: d/d(boundary radius) and d/d(shell density) -----
+# A fully parametric LayeredEarth makes the shell boundary positions and densities
+# differentiable inputs. We map the sensitivity to the core-mantle boundary radius
+# and to a core shell's mass density.
+model = jaxnu.prem_layered(n_sub=3)
+outer_np = np.array(model.outer)
+inner_np = np.concatenate([[0.0], outer_np[:-1]])
+k_cmb = int(np.argmin(np.abs(outer_np - jaxnu.earth.CORE_RADIUS_KM)))  # core-mantle boundary
+core_shells = np.where(inner_np < jaxnu.earth.CORE_RADIUS_KM)[0]
+k_core = int(core_shells[len(core_shells) // 2])                       # a mid-core shell
+
+
+def model_grids(E, cz):
+    def cell(e, c):
+        def P(m):
+            return probability_earth(BASE, e, c, earth_model=m,
+                                     flavor_in=Flavor.MU, flavor_out=Flavor.E)
+        val = P(model)
+        jac = jax.jacrev(P)(model)          # LayeredEarth of gradients
+        return val, jac.outer[k_cmb], jac.density[k_core]
+    f = jax.jit(lambda E, cz: jax.vmap(lambda c: jax.vmap(lambda e: cell(e, c))(E))(cz))
+    return f(E, cz)
+
+P4, gR, gd = (np.array(a) for a in model_grids(jnp.asarray(E2), jnp.asarray(cz)))
+fig, axs = plt.subplots(1, 3, figsize=(14, 3.8), dpi=130, constrained_layout=True)
+_panel(axs[0], E2, cz, P4, r"$P(\nu_\mu\to\nu_e)$", diverging=False)
+_panel(axs[1], E2, cz, gR,
+       rf"$\partial P/\partial R_{{\rm cmb}}$ (core-mantle boundary, $\approx{outer_np[k_cmb]:.0f}$ km) [/km]")
+_panel(axs[2], E2, cz, gd,
+       rf"$\partial P/\partial\rho$ (core shell $\approx{0.5*(inner_np[k_core]+outer_np[k_core]):.0f}$ km) [/(g/cm$^3$)]")
+for ax in (axs[1], axs[2]):
+    ax.axhline(cz_core, color="k", ls="--", lw=0.8)
+for ax in axs:
+    ax.set_xscale("log")
+    ax.set_xlabel(r"$E_\nu$ [GeV]")
+axs[0].set_ylabel(r"$\cos\theta_z$")
+fig.suptitle(r"Earth-model oscillograds: sensitivity to a layer-boundary position "
+             r"and to a core shell's mass density", fontsize=12)
+fig.savefig(OUT / "oscillograds_earth_model.jpg", dpi=130)
+print("saved", OUT / "oscillograds_earth_model.jpg")
+print(f"core-mantle boundary shell index {k_cmb} (R={outer_np[k_cmb]:.0f} km); "
+      f"max |dP/dR_cmb| mantle-only = {np.max(np.abs(gR[cz > cz_core])):.2e}, "
+      f"core-crossing = {np.max(np.abs(gR[cz < cz_core])):.2e}")

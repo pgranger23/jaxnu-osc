@@ -13,6 +13,7 @@ _jax.config.update("jax_enable_x64", True)
 from . import constants  # noqa: E402
 from .params import OscParams, nufit_no  # noqa: E402
 from . import earth  # noqa: E402
+from .earth import LayeredEarth, prem_layered  # noqa: E402
 from . import nufast as nufast  # noqa: E402  (fast analytic constant-density)
 from . import solar  # noqa: E402  (solar profile + adiabatic MSW)
 from . import ode  # noqa: E402  (continuous-density backend)
@@ -50,6 +51,8 @@ __all__ = [
     "NFlavorParams",
     "pmns_3plus1",
     "pmns_nflavor",
+    "LayeredEarth",
+    "prem_layered",
     "constants",
     "earth",
     "nufast",
