@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.egg
+build/
+dist/
+.eggs/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.ipynb_checkpoints/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# JAX / data caches
+.jax_cache/
+
+# OS / editors
+.DS_Store
+*.swp
+.idea/
+.vscode/
+
+# Solar SSM table is downloaded by the example if missing; the bundled copy is
+# tracked, but local downloads elsewhere are not.
+examples/data/ssm/
