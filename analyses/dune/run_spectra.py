@@ -8,7 +8,7 @@ import jax.numpy as jnp
 import dune
 
 d = dune.data()
-p = dune._params_from(jnp.array([dune.NUFIT_NO["theta23"], dune.NUFIT_NO["theta13"],
+p = dune.params_from(jnp.array([dune.NUFIT_NO["theta23"], dune.NUFIT_NO["theta13"],
                                  dune.NUFIT_NO["dm31"], 0.0]))
 comps = dune.rule_components(p)
 

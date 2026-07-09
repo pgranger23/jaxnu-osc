@@ -212,7 +212,7 @@ def rule_components(params, rho=RHO):
     return out
 
 
-def _params_from(vec):
+def params_from(vec):
     # vec = [theta23, theta13, dm31, deltacp]
     return OscParams(theta12=jnp.asarray(NUFIT_NO["theta12"]),
                      theta13=vec[1], theta23=vec[0], deltacp=vec[3],
@@ -247,10 +247,39 @@ def asimov(deltacp, **over):
 
 # --- chi-square with normalization systematics ---------------------------
 
-def _chi2(free, data_tuple):
+def fine_W():
+    """Rebinning matrix that just selects the fine bins in the energy window."""
+    d = data()
+    idx = np.where(d.win)[0]
+    W = np.zeros((len(idx), d.nreco))
+    W[np.arange(len(idx)), idx] = 1.0
+    return jnp.asarray(W)
+
+
+def rebin_matrix(edges):
+    """Rebinning matrix ``W`` (K, nreco) for K analysis bins with the given edges.
+
+    ``W[k, i]`` is the fraction of native fine-bin ``i`` (width-weighted overlap)
+    that falls in analysis bin ``k = [edges[k], edges[k+1]]``, so
+    ``coarse_spectrum = W @ fine_spectrum``. **Differentiable in ``edges``** (via
+    clip/min/max), which is the intended hook for a binning-optimization agent:
+    parametrize ``edges``, pass ``W = rebin_matrix(edges)`` to
+    :func:`cpv_sensitivity` (evaluation) or build a Fisher-information objective from
+    ``W @ jacobian`` (optimization), and gradient-ascend the sensitivity.
+    """
+    d = data()
+    lo = jnp.asarray(d.reco_edges[:-1]); hi = jnp.asarray(d.reco_edges[1:])
+    edges = jnp.asarray(edges)
+    overlap = jnp.clip(jnp.minimum(hi[None, :], edges[1:, None])
+                       - jnp.maximum(lo[None, :], edges[:-1, None]), 0.0, None)
+    return overlap / (hi - lo)[None, :]
+
+
+def chi2(free, data_tuple, W):
     """free = [theta23, theta13, dm31, deltacp, drho, xi_0..xi_8] (15).
 
-    ``drho`` is the fractional matter-density pull (density = RHO*(1+drho))."""
+    ``W`` (K, nreco) rebins the fine model into the K analysis bins used in the
+    Poisson chi2. ``drho`` is the fractional matter-density pull."""
     d = data()
     th23, th13, dm31, dcp, drho = free[0], free[1], free[2], free[3], free[4]
     xi = free[5:14]
@@ -263,7 +292,7 @@ def _chi2(free, data_tuple):
         model = jnp.zeros(d.nreco)
         for (sys, _sig, arr) in comps[rule]:
             model = model + (1.0 + xi[d.sys_index[sys]]) * arr
-        m = jnp.clip(model[d.win], 1e-9, None); obs = dat[d.win]
+        m = jnp.clip(W @ model, 1e-9, None); obs = W @ dat
         chi = chi + 2.0 * jnp.sum(m - obs + obs * jnp.log(obs / m))
     chi = chi + jnp.sum((xi / d.sigma_vec) ** 2)                 # syst penalties
     chi = chi + ((th13 - NUFIT_NO["theta13"]) /
@@ -272,16 +301,16 @@ def _chi2(free, data_tuple):
     return chi
 
 
-_chi2_vg = jax.jit(jax.value_and_grad(_chi2))
+chi2_vg = jax.jit(jax.value_and_grad(chi2))
 
 
-def _minimize(data_tuple, starts, bounds):
+def _minimize(data_tuple, starts, bounds, W):
     """Gradient-based profile of chi2 (jaxnu gives the exact gradient)."""
     from scipy.optimize import minimize
     best = np.inf
     for x0 in starts:
         def fun(x):
-            v, g = _chi2_vg(jnp.asarray(x), data_tuple)
+            v, g = chi2_vg(jnp.asarray(x), data_tuple, W)
             return float(v), np.asarray(g)
         r = minimize(fun, np.asarray(x0), jac=True, method="L-BFGS-B",
                      bounds=bounds, options=dict(maxiter=300, ftol=1e-10))
@@ -294,9 +323,11 @@ def _octants():
     return [th, np.arcsin(np.sqrt(1 - np.sin(th) ** 2))]
 
 
-def cpv_sensitivity(deltacp_true_over_pi):
-    """sigma = sqrt(dChi2) for CP violation vs true delta_cp."""
+def cpv_sensitivity(deltacp_true_over_pi, W=None):
+    """sigma = sqrt(dChi2) for CP violation vs true delta_cp. ``W`` = binning."""
     d = data()
+    if W is None:
+        W = fine_W()
     XI0 = [0.0] * 9
     out = []
     for x in deltacp_true_over_pi:
@@ -307,14 +338,16 @@ def cpv_sensitivity(deltacp_true_over_pi):
                       (dtest, dtest), (-0.1, 0.1)] + [(-0.6, 0.6)] * 9
             starts = [[o, NUFIT_NO["theta13"], NUFIT_NO["dm31"], dtest, 0.0] + XI0
                       for o in _octants()]
-            chi = min(chi, _minimize(dat, starts, bounds))
+            chi = min(chi, _minimize(dat, starts, bounds, W))
         out.append(np.sqrt(max(chi, 0.0)))
     return np.array(out)
 
 
-def mass_ordering_sensitivity(deltacp_true_over_pi):
+def mass_ordering_sensitivity(deltacp_true_over_pi, W=None):
     """sigma = sqrt(dChi2) to reject the wrong (inverted) ordering, true NO."""
     d = data()
+    if W is None:
+        W = fine_W()
     XI0 = [0.0] * 9
     dm31_io = -2.512e-3 + NUFIT_NO["dm21"]        # NuFIT 4.0 IO
     bounds = [(0.60, 0.95), (0.10, 0.20), (-2.75e-3, -2.30e-3),
@@ -324,5 +357,5 @@ def mass_ordering_sensitivity(deltacp_true_over_pi):
         dat = tuple(jnp.asarray(asimov(x * np.pi)[r]) for r in d.rules)
         starts = [[o, NUFIT_NO["theta13"], dm31_io, dt, 0.0] + XI0
                   for o in _octants() for dt in (-np.pi / 2, 0.0, np.pi / 2, np.pi)]
-        out.append(np.sqrt(max(_minimize(dat, starts, bounds), 0.0)))
+        out.append(np.sqrt(max(_minimize(dat, starts, bounds, W), 0.0)))
     return np.array(out)
