@@ -88,6 +88,17 @@ Each is non-zero **only for trajectories that reach that radius** — the bounda
 sensitivity below cos θ_z ≈ −0.84, the 1735 km shell only below ≈ −0.96 — so the
 gradients exactly trace the radial geometry. (Matches finite differences to ~1e−8.)*
 
+## Application: DUNE long-baseline sensitivity
+
+[`analyses/dune/`](analyses/dune) reproduces the **DUNE TDR oscillation analysis**
+using jaxnu for the oscillation probabilities and DUNE's official GLoBES
+configuration (arXiv:2103.04797) for the flux, cross-sections, per-channel
+migration matrices, efficiencies, and systematics. The far-detector spectra match
+the reference essentially exactly, and the CP-violation and mass-ordering
+sensitivities reproduce the DUNE curves (correct shapes, peak positions, and zeros)
+— with the χ² profiled over ~15 parameters using the **exact gradient from jaxnu**
+(`jax.value_and_grad` → L-BFGS). See its [README](analyses/dune/README.md).
+
 ## Installation
 
 ```bash
