@@ -179,7 +179,7 @@ class DuneData:
                 ms.append((oscch, bar, sys, sig))
             self.kernels[rule] = Ks
             self.meta[rule] = ms
-        self.win = (self.reco_c > 0.5) & (self.reco_c < 8.0)  # energy window (GeV)
+        self.win = (self.reco_c > 0.5) & (self.reco_c < 18.0)  # @energy_window
 
 
 # --- oscillation + spectra (jaxnu) ---------------------------------------
