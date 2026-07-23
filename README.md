@@ -185,6 +185,61 @@ params5 = jaxnu.NFlavorParams(U=U, msq=jnp.array([0, dm21, dm31, dm41, dm51]), n
 Both NSI and sterile parameters are differentiable leaves — `jax.grad` works through
 `NSI(...)` and `Sterile3plus1(...)`.
 
+### Decoherence and non-unitary mixing
+
+```python
+# Lindblad decoherence Gamma_ij = gamma_ij (E/E0)^n, or wave-packet separation
+P = jaxnu.decoherence.probability(params, E, L, jaxnu.Decoherence(gamma21=1e-14, n=0),
+                                  density=2.8)
+P = jaxnu.decoherence.probability(params, E, L, jaxnu.WavePacket(sigma_x_m=2e-13))
+
+# non-unitary mixing N = (1 - alpha) U: zero-distance effect + non-cancelling
+# NC matter term included
+P = jaxnu.nonunitarity.probability(params, jaxnu.NonUnitarity(alpha21=0.02 + 0.01j),
+                                   E, L, density=2.8)
+```
+
+Both are validated against their exact limits (γ→0 / α→0 reproduce the standard
+probabilities to ~1e-15; full damping gives the interference-averaged rates; the
+L→0 flavor violation matches the analytic zero-distance formula) and are
+differentiable through `gamma` / `sigma_x` / `alpha` — decoherence and
+unitarity-violation sensitivity forecasts are one `jax.grad` away.
+
+### Loading GLoBES experiments (a "differentiable GLoBES")
+
+`jaxnu.globes` parses a GLoBES/AEDL experiment definition — includes, channels,
+rules, migration matrices or analytic Gaussian smearing, efficiencies,
+normalization systematics, matter profile — and turns it into a differentiable
+forward model:
+
+```python
+exp = jaxnu.globes.load("DUNE_GLoBES.glb", scale=1.21)
+spectra = exp.spectra(params)                 # dict rule -> reco spectrum
+chi2 = exp.chi2(params, xi, data)             # Poisson + norm systematics
+grad = jax.grad(lambda p: exp.spectra(p)["nue_app"].sum())(params)
+```
+
+Validated end-to-end on the official DUNE TDR configuration (it reproduces the
+bespoke DUNE analysis in `analyses/dune` to ~1e-5 — and parsing the file's
+`@energy_window` even caught a hand-coded window bug in the bespoke version).
+See the module docstring for the supported AEDL subset.
+
+### Fisher forecasts and Bayesian fits (`jaxnu.stat`)
+
+```python
+F = jaxnu.stat.fisher_matrix(model, params)     # exact Poisson Fisher via autodiff
+F = F.with_prior("theta13", 0.002)              # reactor constraint
+F.sigma("deltacp")                              # marginalized 1-sigma forecast
+F.fixed("dm31").sigma("deltacp")                # conditional bound
+```
+
+The Fisher matrix equals the Asimov-χ² curvature (tested), and pairs naturally
+with gradient-based samplers: [examples/hmc_posterior.py](examples/hmc_posterior.py)
+runs a blackjax **NUTS** posterior of (θ₂₃, θ₁₃, Δm²₃₁, δ_CP) for a DUNE-like
+experiment using exact jaxnu gradients and overlays the analytic Fisher ellipses:
+
+![HMC posterior vs Fisher](examples/hmc_posterior.jpg)
+
 ---
 
 ## Algorithm choices
@@ -366,6 +421,10 @@ jaxnu/
   oscillator.py  high-level API (vacuum / constant / earth / profile)
   nsi.py         non-standard interactions
   sterile.py     3+N sterile front-end
+  decoherence.py Lindblad / wave-packet decoherence
+  nonunitarity.py non-unitary mixing (alpha parametrization)
+  globes.py      generic GLoBES/AEDL experiment loader
+  stat.py        Fisher information & chi2 utilities
   solar.py       solar profile + adiabatic MSW
   ode.py         continuous-density backend (odeint / diffrax)
 ```
