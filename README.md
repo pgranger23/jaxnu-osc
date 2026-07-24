@@ -205,6 +205,21 @@ L→0 flavor violation matches the analytic zero-distance formula) and are
 differentiable through `gamma` / `sigma_x` / `alpha` — decoherence and
 unitarity-violation sensitivity forecasts are one `jax.grad` away.
 
+![decoherence](examples/decoherence.jpg)
+
+*Left: Lindblad damping washes the DUNE-baseline νμ survival oscillations out
+toward the interference-averaged rate as γL grows. Right: the classic reactor
+wave-packet signature at a JUNO-like baseline — the fast Δm²₃₁ wiggles disappear
+as σ_x shrinks while the slow solar oscillation survives.
+([examples/decoherence_plot.py](examples/decoherence_plot.py))*
+
+![non-unitarity](examples/nonunitarity.jpg)
+
+*Left: |α₂₁| = 0.02 shifts the DUNE appearance probability with a phase φ₂₁
+dependence that mimics δ_CP (the NU–CP degeneracy). Right: the zero-distance
+effect — P(νμ→νe) plateaus at the analytic |(NN†)_eμ|² value (dotted) instead of
+vanishing as L→0. ([examples/nonunitarity_plot.py](examples/nonunitarity_plot.py))*
+
 ### Loading GLoBES experiments (a "differentiable GLoBES")
 
 `jaxnu.globes` parses a GLoBES/AEDL experiment definition — includes, channels,
@@ -223,6 +238,13 @@ Validated end-to-end on the official DUNE TDR configuration (it reproduces the
 bespoke DUNE analysis in `analyses/dune` to ~1e-5 — and parsing the file's
 `@energy_window` even caught a hand-coded window bug in the bespoke version).
 See the module docstring for the supported AEDL subset.
+
+![DUNE spectra from the GLoBES loader](examples/dune_globes.jpg)
+
+*The classic DUNE TDR figure straight from `jaxnu.globes.load`: νe / ν̄e
+appearance for δ_CP = −π/2, 0, +π/2 (note the CP effect flipping sign between
+neutrino and antineutrino modes), backgrounds shaded.
+([examples/dune_globes_plot.py](examples/dune_globes_plot.py))*
 
 ### Fisher forecasts and Bayesian fits (`jaxnu.stat`)
 
