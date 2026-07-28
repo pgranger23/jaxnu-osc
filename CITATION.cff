@@ -4,13 +4,13 @@ message: >-
   and, once available, the accompanying paper (see "preferred-citation").
 type: software
 title: "jaxnu: an autodiff-first neutrino oscillation engine in JAX"
-version: 0.1.0
-date-released: "2026-07-27"
+version: 0.1.1
+date-released: "2026-07-28"
 authors:
   - family-names: Granger
     given-names: Pierre
-    affiliation: "SLAC National Accelerator Laboratory"
-    orcid: "https://orcid.org/0000-0000-0000-0000"  # TODO: replace with the real ORCID iD
+    affiliation: "CERN"
+    orcid: "https://orcid.org/0000-0002-8333-4393"
 repository-code: "https://github.com/pgranger23/jaxnu-osc"
 url: "https://github.com/pgranger23/jaxnu-osc"
 license: MIT
@@ -45,8 +45,8 @@ preferred-citation:
   authors:
     - family-names: Granger
       given-names: Pierre
-      affiliation: "SLAC National Accelerator Laboratory"
-      orcid: "https://orcid.org/0000-0000-0000-0000"  # TODO: replace with the real ORCID iD
+      affiliation: "CERN"
+      orcid: "https://orcid.org/0000-0002-8333-4393"
   year: 2026
   journal: "Journal of Physics G (submitted)"  # TODO: confirm final venue
   notes: >-
