@@ -124,6 +124,30 @@ def fisher(theta, res_lne=RES_LNE, res_cz=RES_CZ):
     return J.T @ (J / mu[:, None]), mu, J
 
 
+def _true_space():
+    """mu and dmu/dtheta BEFORE the response matrix, computed once.
+
+    The response matrix depends on the resolutions but not on theta, and it
+    enters linearly, so mu(res) = R(res) @ mu_true and J(res) = R(res) @ J_true.
+    Factoring it out this way turns a resolution scan -- which would otherwise
+    need a full jacfwd through the layered Earth per point -- into a sequence of
+    small matrix products.
+    """
+    mu_true = _NORM * _shape(THETA0)
+    J_true = _NORM * jax.jacfwd(_shape)(THETA0)
+    return mu_true, J_true
+
+
+def sigma_from_response(res_cz, mu_true, J_true, res_lne=RES_LNE):
+    """sigma(ln rho_core) for a given angular resolution, reusing the true-space
+    Jacobian.  Must agree with sigma_core() below, which recomputes everything."""
+    R = response(res_lne, res_cz)
+    mu = R @ mu_true
+    J = R @ J_true
+    F = J.T @ (J / mu[:, None])
+    return float(jnp.sqrt(jnp.linalg.inv(F)[0, 0]))
+
+
 def sigma_core(res_cz, res_lne=RES_LNE):
     """Marginalized sigma(ln rho_core) as a function of angular resolution.
 
@@ -202,6 +226,84 @@ def main():
              theta0=np.asarray(THETA0), labels=np.array(LABELS),
              frac_info=frac_info)
     print("\nsaved tomography_fisher.npz")
+
+    _figure(Jn, mun, per_bin, frac_info, s0, dsdr, frac_bins * 100)
+
+
+def _figure(Jn, mun, per_bin, frac_info, s0, dsdr, frac_bins_pct):
+    """Three panels: the derivative after the full chain, where the information
+    lands, and what the design derivative buys."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    E = np.asarray(E_C).reshape(N_E, N_CZ)
+    CZ = np.asarray(CZ_C).reshape(N_E, N_CZ)
+    dmu = Jn[:, 0].reshape(N_E, N_CZ)
+    info = per_bin.reshape(N_E, N_CZ)
+
+    fig, ax = plt.subplots(1, 3, figsize=(16.5, 4.6))
+
+    # (a) dmu/dln rho_core in RECONSTRUCTED space -- i.e. after flux weighting
+    #     and after the response matrix, unlike Fig. 2 which is true space.
+    v = np.abs(dmu).max()
+    m = ax[0].pcolormesh(CZ, E, dmu, cmap="RdBu_r", vmin=-v, vmax=v,
+                         shading="auto")
+    plt.colorbar(m, ax=ax[0], label=r"$\partial\mu_b/\partial\ln\rho_{\rm core}$")
+    ax[0].set_title(r"(a) count derivative, reconstructed space")
+
+    # (b) per-bin Fisher information on ln rho_core.  Log colour scale: the
+    #     dynamic range is several decades and a linear scale shows only the
+    #     single brightest cell, hiding the structure that makes the point.
+    from matplotlib.colors import LogNorm
+    pos = info[info > 0]
+    m = ax[1].pcolormesh(CZ, E, np.maximum(info, pos.min()), cmap="viridis",
+                         norm=LogNorm(vmin=max(pos.min(), pos.max() * 1e-5),
+                                      vmax=pos.max()), shading="auto")
+    plt.colorbar(m, ax=ax[1], label=r"per-bin contribution to $F_{00}$")
+    ax[1].set_title(r"(b) where the information is")
+    ax[1].annotate(f"{frac_info*100:.0f}% of $F_{{00}}$\n"
+                   f"left of the line\n({frac_bins_pct:.0f}% of the bins)",
+                   xy=(0.42, 0.88), xycoords="axes fraction", color="w",
+                   fontsize=10, fontweight="bold", va="top")
+
+    for a in ax[:2]:
+        a.axvline(CORE_CZ, color="k", ls="--", lw=1.4)
+        a.set_yscale("log")
+        a.set_ylim(E.min(), 20.0)
+        a.set_xlabel(r"$\cos\theta_z$ (reconstructed)")
+        a.annotate("core-crossing", xy=(CORE_CZ, 19.0), xytext=(-4, 0),
+                   textcoords="offset points", rotation=90, ha="right",
+                   va="top", fontsize=8.5)
+    ax[0].set_ylabel("reconstructed energy [GeV]")
+
+    # (c) the design derivative: AD tangent against an explicit scan
+    mu_true, J_true = _true_space()
+    grid = np.linspace(0.04, 0.20, 17)
+    scan = [sigma_from_response(float(r), mu_true, J_true) for r in grid]
+    ax[2].plot(grid, scan, "o-", ms=3.5, color="0.25",
+               label=r"explicit scan (17 Fisher evaluations)")
+    tan = np.linspace(RES_CZ - 0.045, RES_CZ + 0.045, 2)
+    ax[2].plot(tan, s0 + dsdr * (tan - RES_CZ), "r-", lw=2.2,
+               label=fr"AD tangent, $\partial\sigma/\partial\sigma_{{c}}={dsdr:.4f}$"
+                     "\n(one gradient call)")
+    ax[2].plot([RES_CZ], [s0], "r*", ms=13, zorder=5)
+    ax[2].set_xlabel(r"angular resolution $\sigma_{\cos\theta_z}$")
+    ax[2].set_ylabel(r"$\sigma(\ln\rho_{\rm core})$, marginalized")
+    ax[2].set_title("(c) the experimental-design derivative")
+    ax[2].legend(fontsize=8.5, loc="upper left")
+    ax[2].grid(alpha=0.3)
+
+    fig.tight_layout()
+    for ext in ("png", "pdf"):
+        fig.savefig(f"tomography_fisher.{ext}", dpi=150, bbox_inches="tight")
+    print("saved tomography_fisher.png/.pdf")
+
+    # the scan and the AD tangent are independent routes to the same slope
+    i = int(np.argmin(np.abs(grid - RES_CZ)))
+    num = (scan[i + 1] - scan[i - 1]) / (grid[i + 1] - grid[i - 1])
+    print(f"  cross-check: scan slope at the operating point = {num:+.5f} "
+          f"vs AD {dsdr:+.5f}")
 
 
 if __name__ == "__main__":
