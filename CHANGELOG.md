@@ -1,0 +1,97 @@
+# Changelog
+
+All notable changes to this project are documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/).
+
+## [Unreleased]
+
+### Added
+
+- **`jaxnu.earth.critical_cos_zenith()`** — returns the `cos θ_z` values at
+  which the neutrino chord grazes a PREM shell boundary. At those angles the
+  entering shell contributes a length `~ sqrt(r_b² - r_min²)`, a genuine
+  sqrt-cusp, so `dP/d cos θ_z` diverges like `1/sqrt(|Δ|)`: measured ~1.6e3 at
+  1e-6 from the core–mantle boundary against ~1.6 nearby. This is inherent to
+  piecewise-constant shells and is *not* smoothed away; the helper exists so
+  that gradient-based optimizers which move `cos θ_z` bin edges continuously
+  can avoid parking an edge on one of them.
+- **`benchmarks/`** — the timing, precision and BSM-limit scripts behind the
+  numbers quoted in the accompanying paper, so they can be reproduced from a
+  clone of this repository rather than only from the authors' analysis code.
+- **`CITATION.cff`** and this changelog.
+- **New test modules** `tests/test_geometry_grad.py`,
+  `tests/test_backend_edge_cases.py` and `tests/test_api_validation.py`,
+  covering the geometry/density gradients against finite differences, the
+  degenerate and null-parameter corners, the inverted ordering (previously
+  untested anywhere), and the new input validation under `jit`/`vmap`.
+
+### Fixed
+
+- **`cos(zenith) = ±1` gradients were silently halved.** The Earth-geometry
+  code computed `rmin2 = r_det**2 * clip(1 - cz**2, 0, None)`, which landed
+  exactly on the `clip` tie at the poles (`cz = ±1`); this halved
+  `d(baseline_km)/d(cos θ_z)` and every downstream gradient (`dP/d cos θ_z`)
+  evaluated exactly there. Straight-up/straight-down trajectories now get
+  the correct one-sided derivative, matching finite differences.
+- **The `nufast` backend could return `NaN` at `Δm²₂₁ = 0` or `θ₁₃ = 0`.**
+  These are physically legitimate inputs (e.g. probing the two-flavor limit,
+  or scanning `θ₁₃` down to zero), but the analytic constant-density formula
+  hit a `0/0` in the eigenvalue-gap machinery there. It now returns the
+  correct (finite) probability instead of `NaN`.
+- **`jax.grad(baseline_km)` returned `NaN` at the horizon (`cos θ_z = 0`).**
+  The ascending-leg length was computed as a bare `sqrt(clip(...))` whose
+  argument is exactly zero there; the enclosing `jnp.where` hid the divergent
+  `sqrt'(0)` in forward mode, but reverse mode still propagated `NaN` back
+  through the unselected branch (`jax.grad` gave `NaN` while `jax.jacfwd` gave
+  `0` — the tell-tale signature). It now uses the same guarded helper as the
+  rest of the chord code, and the two AD modes agree everywhere.
+- **`nufit_no()` was documented as NuFIT 5.2 but returns NuFIT 5.1 values.**
+  The numbers match the NuFIT 5.1 (2021) normal-ordering best fit without SK
+  atmospheric data digit for digit (5.2 quotes `dm31 = 2.511e-3`,
+  `theta23 = 49.1 deg`, `deltacp = 197 deg`). Only the docstring changed; the
+  returned parameters are unchanged.
+- **`nsi=` accepted non-Hermitian matrices.** Passing a raw matter-NSI matrix
+  (as opposed to a `jaxnu.nsi.NSI(...)` instance, which builds a Hermitian
+  matrix by construction) with `eps_{alpha,beta} != conj(eps_{beta,alpha})`
+  used to be accepted silently, which breaks unitarity of the propagated
+  amplitude (injects unphysical gain/loss into some channels). A
+  non-Hermitian raw `nsi=` matrix now raises `ValueError` on concrete input
+  (the check is skipped under `jit`/`vmap`, consistent with the rest of the
+  input validation below).
+- **Missing input validation.** Public API calls with physically
+  nonsensical concrete inputs (negative energy, negative baseline/density,
+  `|cos θ_z| > 1`, out-of-range flavor indices, ...) used to either produce
+  silently wrong probabilities or an opaque downstream `NaN`/shape error
+  instead of a clear message. These now raise `ValueError` naming the bad
+  argument and the expected units/range, when the value is concrete;
+  as before, no check can run on a value being traced under `jit`/`vmap`/
+  `grad`, so those code paths are unaffected and unchanged in behavior.
+- **`jaxnu.solar.adiabatic_mass_fractions` raised on a scalar `r_km`.**
+  Passing a single (scalar) radius, as shown in `README.md`'s solar
+  snippet, used to raise a `vmap` rank error because the function assumed
+  an array input internally. Scalar `r_km` is now accepted directly and
+  returns a 1-D array of per-mass-state fractions (array `r_km` input and
+  its output shape are unchanged).
+- **`Sterile3plus1` / `pmns_3plus1` hardwired the `θ₁₄` CP phase (`δ₁₄`) to
+  zero.** The 3+1 mixing-matrix builder had no way to set the Dirac phase
+  associated with the `(0,3)` (`θ₁₄`) rotation, silently dropping a
+  physical degree of freedom of the 3+1 model. `delta14` is now a
+  constructor argument (defaulting to `0.0`, so existing code and saved
+  parameter values are unaffected) that changes the active-sterile
+  appearance probabilities as expected.
+
+## [0.1.0] - TBD
+
+(Version number is set in `pyproject.toml` / `jaxnu/__init__.py`; the release
+date will be filled in when this version is actually tagged and published —
+see "Releasing to PyPI" in `README.md`.)
+
+Initial release: vacuum, constant-density matter, layered PREM Earth (with
+atmospheric production height and detector depth), arbitrary user-supplied
+density profiles, and adiabatic solar propagation; matter non-standard
+interactions and 3+N sterile neutrinos. Four cross-checked propagation
+backends (`cayley`, `eigh`, `expm`, `nufast`) and an optional continuous ODE
+backend (`odeint` / `diffrax`). Validated against OscProb and NuFast and
+against the nu-waves reference plots (see `validation/README.md`).

@@ -54,10 +54,45 @@ only the kinematic ħc rounding (~1e-6) remains.
 * **Full PREM** — vs the *converged* NuFast model
   `PREM_NDiscontinuityLayer(400,400,400,400)`, core-crossing `P(νe→νe)`:
 
-  | E (GeV) | jaxnu (n_sub=100) | NuFast (n=400) | diff |
-  |---------|-------------------|----------------|------|
-  | 2.0     | 0.79995129        | 0.79995640     | 5e-6 |
-  | 5.0     | 0.07961324        | 0.07961404     | 8e-7 |
+  | E (GeV) | jaxnu (n_sub=100) | NuFast (n=400) | diff   |
+  |---------|-------------------|----------------|--------|
+  | 2.0     | 0.79995324        | 0.79995640     | 3.2e-6 |
+  | 5.0     | 0.07961307        | 0.07961404     | 9.7e-7 |
+
+  (Recomputed 2026-07-28 with the current shell-table code; an earlier revision
+  of this file quoted 0.79995129 / 0.07961324, which no longer matches.)
+
+#### Segmentation convergence — the residual is not a jaxnu discretization artifact
+
+Sweeping jaxnu's own sub-shell refinement `n_sub` against the same fixed
+NuFast reference shows the deviation *plateauing* rather than continuing to
+fall, i.e. jaxnu's PREM integration is converged and what remains is a
+convention difference (electron fraction, shell definition) between the two
+codes, not a propagation or discretization error on jaxnu's side:
+
+  | n_sub | diff @ 2 GeV | diff @ 5 GeV |
+  |-------|--------------|--------------|
+  | 5     | 3.21e-5      | 7.39e-6      |
+  | 20    | 5.41e-6      | 6.58e-7      |
+  | 50    | 3.46e-6      | 9.36e-7      |
+  | 100   | 3.16e-6      | 9.74e-7      |
+  | 200   | 3.10e-6      | 9.85e-7      |
+  | 400   | 3.08e-6      | 9.88e-7      |
+  | 800   | 3.07e-6      | 9.88e-7      |
+
+Beyond `n_sub ≈ 100–200` the difference is flat to three digits, so increasing
+the refinement further buys nothing.
+
+#### Provenance of the external reference numbers
+
+The NuFast-Earth and OscProb values quoted in this file and frozen into
+`tests/test_nufast_reference.py` / `tests/test_oscprob_reference.py` were
+produced by running those external codes manually; the driver programs are
+**not** committed here, and the exact upstream versions used were not recorded
+at the time. The literals are therefore reproducible only by rebuilding the
+external codes and re-running the configurations described above. Anyone
+regenerating them should record the upstream commit hash alongside the new
+numbers.
 
 ### The `PREM_Full` subtlety
 

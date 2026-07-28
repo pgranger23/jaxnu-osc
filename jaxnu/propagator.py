@@ -33,6 +33,23 @@ def propagator_expm(h, length):
     return jsl.expm(-1j * h * length)
 
 
+# Threshold below which two eigenphases are treated as confluent and the
+# divided difference (f(a)-f(b))/(a-b) is replaced by its derivative form.
+#
+# Measured, do not raise without re-measuring: eigvalsh3 resolves an exactly
+# degenerate pair only to ~5e-7 (relative to the spectral radius), because the
+# trigonometric cubic solution goes through arccos(r)/3 whose derivative
+# diverges as r -> +-1.  That computed splitting exceeds this threshold, so at
+# exact degeneracy the ordinary divided-difference branch is what actually runs.
+# That is deliberate: it is the more accurate of the two here.  Sweeping this
+# constant against a scipy.linalg.expm reference (15 random Hermitian 3x3 per
+# point) gives, for the propagator error at exact degeneracy / worst case over
+# true gaps 1e-5..1:
+#     1e-7 (this value) -> 1.2e-14 / 1.2e-14
+#     1e-6              -> 1.3e-13 / 7.1e-14
+#     1e-5              -> 1.4e-13 / 4.9e-11
+# i.e. engaging the confluent branch earlier costs accuracy, because it drops
+# O(d) terms that are not actually negligible at a splitting of ~5e-7.
 _DEGEN_EPS = 1e-7
 
 

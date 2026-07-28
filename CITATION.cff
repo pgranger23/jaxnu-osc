@@ -1,0 +1,56 @@
+cff-version: 1.2.0
+message: >-
+  If you use jaxnu in your research, please cite the software itself (below)
+  and, once available, the accompanying paper (see "preferred-citation").
+type: software
+title: "jaxnu: an autodiff-first neutrino oscillation engine in JAX"
+version: 0.1.0
+date-released: "2026-07-27"
+authors:
+  - family-names: Granger
+    given-names: Pierre
+    affiliation: "SLAC National Accelerator Laboratory"
+    orcid: "https://orcid.org/0000-0000-0000-0000"  # TODO: replace with the real ORCID iD
+repository-code: "https://github.com/pgranger23/jaxnu-osc"
+url: "https://github.com/pgranger23/jaxnu-osc"
+license: MIT
+keywords:
+  - neutrino oscillations
+  - automatic differentiation
+  - JAX
+  - matter effects
+  - PREM
+  - non-standard interactions
+  - sterile neutrinos
+abstract: >-
+  jaxnu is a neutrino oscillation calculator written in JAX, differentiable
+  end-to-end with respect to both the oscillation parameters and the
+  propagation geometry. It supports vacuum, constant-density matter, the
+  layered PREM Earth (with atmospheric production height), arbitrary
+  user-supplied density profiles, and adiabatic solar propagation, with
+  non-standard interactions and 3+N sterile neutrinos as first-class
+  extensions.
+identifiers:
+  - type: doi
+    value: "10.5281/zenodo.TODO"  # TODO: fill in once Zenodo mints the archival DOI for this release
+    description: "Zenodo archive of this software release (TODO: not yet minted)"
+preferred-citation:
+  # TODO: this entry describes a paper that is IN PREPARATION as of this
+  # release. It is a placeholder for the eventual published/preprint
+  # reference and must not be treated as, or cited as, an already-published
+  # work until the TODOs below are filled in (journal DOI / arXiv ID).
+  type: article
+  status: "in-preparation"  # TODO: update to "preprint" / "published" and fill in identifiers below
+  title: "jaxnu: an autodiff-first neutrino oscillation engine for differentiable analysis pipelines"
+  authors:
+    - family-names: Granger
+      given-names: Pierre
+      affiliation: "SLAC National Accelerator Laboratory"
+      orcid: "https://orcid.org/0000-0000-0000-0000"  # TODO: replace with the real ORCID iD
+  year: 2026
+  journal: "Journal of Physics G (submitted)"  # TODO: confirm final venue
+  notes: >-
+    TODO: this reference is a placeholder for a paper in preparation. Fill in
+    the "doi" and "url" fields (arXiv ID and/or journal DOI) once available;
+    they are intentionally omitted here rather than filled with dummy values,
+    since the CFF schema validates them as real DOI/URL strings.

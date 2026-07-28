@@ -31,12 +31,29 @@ def pmns_nflavor(n, rotations):
 
 
 def pmns_3plus1(theta12, theta13, theta23, theta14, theta24, theta34,
-                delta13=0.0, delta24=0.0):
-    """3+1 PMNS matrix ``U = R34 R24 R14 R23 R13 R12`` (flavors e, mu, tau, s)."""
+                delta13=0.0, delta14=0.0, delta24=0.0):
+    """3+1 PMNS matrix ``U = R34 R24 R14 R23 R13 R12`` (flavors e, mu, tau, s).
+
+    Convention: a general Dirac 3+1 mixing matrix has three physical CP phases.
+    Following the standard 3+1 convention (e.g. Kopp, Machado, Parke, Zuber
+    2013), each is placed on the rotation that pairs flavor ``e`` (index 0)
+    with a heavier mass state, with no phase on the (2, 3) rotation (any phase
+    there is unphysical -- removable by rephasing):
+
+        theta13 rotation (0, 2) carries ``delta13`` (the standard 3-flavor
+            Dirac CP phase),
+        theta14 rotation (0, 3) carries ``delta14`` (active-sterile phase),
+        theta24 rotation (1, 3) carries ``delta24`` (second active-sterile
+            phase),
+        theta23 (1, 2), theta12 (0, 1), theta34 (2, 3) are real (no phase).
+
+    ``delta14`` defaults to 0.0, preserving the matrix produced before this
+    parameter existed.
+    """
     return pmns_nflavor(4, [
         (2, 3, theta34),
         (1, 3, theta24, delta24),
-        (0, 3, theta14),
+        (0, 3, theta14, delta14),
         (1, 2, theta23),
         (0, 2, theta13, delta13),
         (0, 1, theta12),
@@ -46,7 +63,12 @@ def pmns_3plus1(theta12, theta13, theta23, theta14, theta24, theta34,
 @jax.tree_util.register_dataclass
 @dataclasses.dataclass(frozen=True)
 class Sterile3plus1:
-    """Differentiable 3+1 sterile parameters (angles in rad, Delta m^2 in eV^2)."""
+    """Differentiable 3+1 sterile parameters (angles in rad, Delta m^2 in eV^2).
+
+    Three physical Dirac CP phases: ``delta13`` (0,2)/theta13, ``delta14``
+    (0,3)/theta14, ``delta24`` (1,3)/theta24 -- see :func:`pmns_3plus1` for the
+    full convention.  ``delta14`` defaults to 0.0 for backward compatibility.
+    """
 
     theta12: jax.Array
     theta13: jax.Array
@@ -59,13 +81,14 @@ class Sterile3plus1:
     dm21: jax.Array
     dm31: jax.Array
     dm41: jax.Array
+    delta14: jax.Array = 0.0
 
     n_active = 3  # class attribute (not a differentiable field)
 
     def pmns(self):
         return pmns_3plus1(self.theta12, self.theta13, self.theta23,
                            self.theta14, self.theta24, self.theta34,
-                           self.delta13, self.delta24)
+                           self.delta13, self.delta14, self.delta24)
 
     def msquared(self):
         zero = jnp.zeros_like(self.dm21)

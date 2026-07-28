@@ -425,6 +425,16 @@ different class on CPU. jaxnu's Earth value is differentiability + GPU/TPU batch
 (where the gap closes). See [DESIGN.md](DESIGN.md) §11 for the GPU-oriented
 NuFast-Earth roadmap item.
 
+### Reproducing the paper's benchmark tables
+
+[`benchmarks/`](benchmarks) has standalone, self-contained scripts (only
+`jaxnu`/`numpy`/`jax`/`matplotlib`) that reproduce every performance and
+validation table in the accompanying paper, plus a README mapping each
+script to the table/figure it reproduces. The paper's own absolute numbers
+were measured on 8 cores of an AMD EPYC 7542 (CPU) and one NVIDIA A100 (GPU);
+expect different absolute timings on other hardware, but the same relative
+ordering of the backends.
+
 ---
 
 ## Module map
@@ -466,14 +476,37 @@ jaxnu/
 
 ## References & acknowledgements
 
-- PREM: Dziewonski & Anderson, *Phys. Earth Planet. Inter.* **25** (1981) 297.
-- NuFast / DMP: Parke & Denton, *NuFast* (arXiv:2405.02400); Denton, Minakata & Parke
-  (arXiv:1604.08167). The `nufast` backend ports the public
-  [NuFast-LBL](https://github.com/PeterDenton/NuFast-LBL) algorithm.
+- **PREM.** Dziewonski & Anderson, *Phys. Earth Planet. Inter.* **25** (1981) 297.
+  `jaxnu/earth.py` implements the PREM density as piecewise polynomials in
+  radius, from the coefficients tabulated in that paper.
+- **NuFast / DMP.** Denton & Parke, *Phys. Rev. D* **110** (2024) 113005
+  (arXiv:2405.02400); see also Denton, Minakata & Parke (arXiv:1604.08167) for
+  the underlying "Rosetta" relations. `jaxnu/nufast.py`'s `nufast` backend is a
+  **close, line-by-line JAX transcription of the reference C++ implementation**
+  that the authors publish alongside the paper as
+  [NuFast-LBL](https://github.com/PeterDenton/NuFast-LBL) — the intermediate
+  variable naming in `jaxnu/nufast.py` tracks that source closely enough that
+  this is a port, not an independent re-derivation from the formulas with new
+  structure. NuFast-LBL is itself MIT-licensed (Copyright (c) 2024 Peter B.
+  Denton); this port is used under the terms of that license, with the original
+  authors' copyright credited here and in `jaxnu/nufast.py`'s module docstring.
+  If you use the `nufast` backend, please also cite Denton & Parke (2024) as the
+  original authors request.
 - Validated against [OscProb](https://github.com/joaoabcoelho/OscProb) and
   [NuFast](https://github.com/PeterDenton); reproduces
-  [nu-waves](https://github.com/nadrino/nu-waves) reference plots.
-- Solar profile: Bahcall, Serenelli & Basu, BS05(AGS,OP) standard solar model.
+  [nu-waves](https://github.com/nadrino/nu-waves) reference plots (see
+  [`examples/nuwaves/README.md`](examples/nuwaves/README.md) for per-figure
+  credit and the one physics-convention caveat on the solar plot).
+- **Solar profile.** Bahcall, Serenelli & Basu, BS05(AGS,OP) standard solar
+  model (astro-ph/0412440); the table shipped at
+  [`examples/data/bs05_agsop.dat`](examples/data/bs05_agsop.dat) is that
+  published model's own data file, used as input to `jaxnu.solar.load_bs05`
+  (`jaxnu/solar.py`), which is otherwise an independent implementation of the
+  textbook averaged-adiabatic MSW formula.
+
+See [`CITATION.cff`](CITATION.cff) for how to cite this software (and the
+accompanying paper, once available), and [`CHANGELOG.md`](CHANGELOG.md) for
+release history.
 
 ## Releasing to PyPI
 

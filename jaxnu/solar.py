@@ -83,9 +83,15 @@ def adiabatic_mass_fractions(params, energy_GeV, profile, r_km,
                              r_emit_km, alpha=0, anti=False):
     """Vacuum mass-state fractions ``F_i(r)`` under adiabatic solar evolution.
 
-    ``r_km`` is an array of radii (km) at which to evaluate; ``r_emit_km`` is the
-    production radius. Returns array of shape ``(len(r_km), N)``.
+    ``r_km`` is a scalar or array of radii (km) at which to evaluate;
+    ``r_emit_km`` is the production radius. Returns array of shape
+    ``(len(r_km), N)`` for array input, or shape ``(N,)`` for scalar input
+    (consistent with the scalar-or-array convention used elsewhere in the API).
     """
+    r_km = jnp.asarray(r_km)
+    scalar_r = r_km.ndim == 0
+    r_km = jnp.atleast_1d(r_km)
+
     u = params.pmns()
     if anti:
         u = jnp.conj(u)
@@ -109,4 +115,5 @@ def adiabatic_mass_fractions(params, energy_GeV, profile, r_km,
         a = udag @ vecs  # <nu_i^vac | nu_k^m> = (U^dag V)[i,k]
         return (jnp.abs(a) ** 2) @ w  # F_i = sum_k |a_ik|^2 w_k
 
-    return jax.vmap(frac_at)(jnp.asarray(r_km))
+    fractions = jax.vmap(frac_at)(r_km)
+    return fractions[0] if scalar_r else fractions

@@ -66,7 +66,7 @@ def prem_density(r_km):
 
 def shell_table(n_sub: int = 4, ye_core: float = YE_CORE_DEFAULT,
                 ye_mantle: float = YE_MANTLE_DEFAULT) -> ShellTable:
-    """Static table of constant-density shells (numpy).
+    """Table of constant-density shells: static radii/density, traceable Y_e.
 
     PREM region boundaries (density discontinuities) are always respected; within
     each region the number of equal-radius sub-shells is allocated **proportional
@@ -79,6 +79,16 @@ def shell_table(n_sub: int = 4, ye_core: float = YE_CORE_DEFAULT,
     it at the path midpoint).  The electron fraction is two-zone: ``ye_core``
     inside ``CORE_RADIUS_KM`` (3480 km), ``ye_mantle`` outside (3480 km is a region
     boundary, so no shell straddles it).
+
+    ``n_sub`` fixes the shell **count**, and the loop below only ever compares
+    ``mid`` (a concrete, numpy-derived radius) against ``CORE_RADIUS_KM`` to pick
+    which zone a shell falls in -- so radii and shape stay static/concrete even
+    if this is traced through ``jax.jit``/``jax.grad``.  ``ye_core``/``ye_mantle``
+    themselves may be JAX tracers (e.g. under ``jax.grad(..., argnums=...)`` for
+    ``dP/dY_e``): they only ever flow into the *values* placed in ``ye`` below, so
+    that column is built as a ``jnp`` array (not ``np.array``, which would force a
+    tracer through ``__array__`` and raise) while ``outer``/``inner``/``rho`` --
+    built from an independent numpy expression -- stay plain numpy.
     """
     dr_target = R_EARTH_KM / (10 * n_sub)
     outer, inner, rho, ye = [], [], [], []
@@ -98,7 +108,7 @@ def shell_table(n_sub: int = 4, ye_core: float = YE_CORE_DEFAULT,
         outer=np.array(outer),
         inner=np.array(inner),
         rho=np.array(rho),
-        ye=np.array(ye),
+        ye=jnp.array(ye),
     )
 
 
@@ -117,6 +127,23 @@ def _d(r2_minus_rmin2):
     big = x > _SQRT_FLOOR
     x_safe = jnp.where(big, x, 1.0)
     return jnp.where(big, jnp.sqrt(x_safe), 0.0)
+
+
+def _rmin2(r_det, cz):
+    """Closest-approach radius squared: ``r_det^2 * sin^2(zenith)``.
+
+    Gradient-safe at the poles: ``s2 = 1 - cz**2`` is mathematically >= 0 for
+    ``cz`` in ``[-1, 1]`` and only dips below zero by floating-point roundoff
+    right at ``cz = +-1``.  A plain ``jnp.clip(s2, 0.0, None)`` lowers to
+    ``jnp.maximum(s2, 0.0)``, whose JAX gradient rule splits the tie 50/50
+    exactly where ``s2 == 0.0`` -- i.e. exactly at the poles -- halving
+    ``d(rmin2)/dcz`` there (and everything downstream: baselines, chord
+    lengths, ``dP/dcz``).  Selecting with ``>=`` instead keeps the gradient on
+    the smooth (physical) branch straight through the tie; the forward value
+    is unchanged.
+    """
+    s2 = 1.0 - cz**2
+    return r_det**2 * jnp.where(s2 >= 0.0, s2, 0.0)
 
 
 def chord_segments(cz, table: ShellTable, h_atm_km=0.0, det_depth_km=0.0,
@@ -149,7 +176,7 @@ def chord_segments(cz, table: ShellTable, h_atm_km=0.0, det_depth_km=0.0,
 
     cz = jnp.asarray(cz, dtype=jnp.float64)
     upgoing = cz < 0.0
-    rmin2 = r_det**2 * jnp.clip(1.0 - cz**2, 0.0, None)
+    rmin2 = _rmin2(r_det, cz)
     s_prod = _d(r_prod**2 - rmin2)            # production point (d-coordinate)
     s_det = r_det * cz                        # detector: + down-going, - up-going
     d_low = jnp.where(upgoing, 0.0, s_det)    # bottom of the descending leg
@@ -245,7 +272,7 @@ def layered_chord_segments(model: LayeredEarth, cz, h_atm_km=0.0, det_depth_km=0
 
     cz = jnp.asarray(cz, dtype=jnp.float64)
     upgoing = cz < 0.0
-    rmin2 = r_det**2 * jnp.clip(1.0 - cz**2, 0.0, None)
+    rmin2 = _rmin2(r_det, cz)   # see _rmin2: clip would halve d/dcz at cz = +-1
     s_prod = _d(r_prod**2 - rmin2)
     s_det = r_det * cz
     d_low = jnp.where(upgoing, 0.0, s_det)
@@ -271,10 +298,46 @@ def baseline_km(cz, det_depth_km=0.0):
     """Total in-Earth chord length (km) for ``cos(zenith) = cz``."""
     r_det = R_EARTH_KM - det_depth_km
     cz = jnp.asarray(cz, dtype=jnp.float64)
-    r_min2 = r_det**2 * jnp.clip(1.0 - cz**2, 0.0, None)
-    desc = jnp.sqrt(jnp.clip(R_EARTH_KM**2 - r_min2, 0.0, None))
-    asc = jnp.sqrt(jnp.clip(r_det**2 - r_min2, 0.0, None))
+    r_min2 = _rmin2(r_det, cz)
+    # Use the guarded _d() rather than a bare sqrt(clip(...)): at the horizon
+    # (cz = 0) the ascending-leg argument r_det^2 - r_min2 is exactly 0, and
+    # sqrt'(0) = inf.  The outer jnp.where hides that in forward mode but
+    # reverse mode still pulls the NaN back through the unselected branch, so
+    # jax.grad(baseline_km)(0.0) returned NaN while jacfwd returned 0.
+    desc = _d(R_EARTH_KM**2 - r_min2)
+    asc = _d(r_det**2 - r_min2)
     return jnp.where(cz < 0.0, desc + asc, 0.0)
+
+
+def critical_cos_zenith(table: ShellTable | None = None, det_depth_km: float = 0.0,
+                        n_sub: int = 4) -> np.ndarray:
+    """Cos(zenith) values at which the chord grazes a shell boundary.
+
+    At these angles the turning-point radius ``r_min(cz)`` exactly equals a
+    shell boundary radius ``r_b``, so the shell the chord is entering
+    contributes a length proportional to ``sqrt(r_b^2 - r_min^2)``: a genuine
+    sqrt-cusp in ``cz`` (inherent piecewise-constant-shell geometry, not a bug
+    to smooth away) where ``dP/dcz`` diverges like ``1/sqrt(|cz - cz_crit|)``.
+
+    Why you would call this: gradient-based optimizers that move cos(zenith)
+    bin edges continuously (e.g. Fisher-optimized binning) should avoid
+    parking an edge exactly on one of these angles -- the local gradient
+    there is unbounded/ill-conditioned even though ``P`` itself is finite and
+    well-defined, so a solver can get stuck or take pathological steps.
+
+    Returns the sorted, unique cos(zenith) (up-going, ``cz < 0``) for every
+    shell boundary radius ``r_b < r_det = R_EARTH_KM - det_depth_km``, as a
+    plain numpy array -- this is a diagnostic helper, not a differentiable
+    path.  ``table`` defaults to ``shell_table(n_sub)`` (boundary radii do not
+    depend on ``ye_core``/``ye_mantle``).
+    """
+    if table is None:
+        table = shell_table(n_sub)
+    r_det = R_EARTH_KM - det_depth_km
+    radii = np.unique(np.concatenate(
+        [np.asarray(table.outer), np.asarray(table.inner)]))
+    radii = radii[(radii > 0.0) & (radii < r_det)]
+    return np.sort(-np.sqrt(1.0 - (radii / r_det) ** 2))
 
 
 def prem_density_jax(r_km):

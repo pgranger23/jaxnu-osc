@@ -13,6 +13,8 @@ from __future__ import annotations
 import enum
 import functools
 
+import numpy as _np
+
 import jax
 import jax.numpy as jnp
 
@@ -36,11 +38,86 @@ def prob_from_amplitude(s):
 
 
 def select(p, flavor_in, flavor_out):
-    """Pick ``P(nu_{flavor_in} -> nu_{flavor_out})`` from a probability matrix."""
-    return p[..., int(flavor_out), int(flavor_in)]
+    """Pick ``P(nu_{flavor_in} -> nu_{flavor_out})`` from a probability matrix.
+
+    Raises ``ValueError`` if either index is out of range for ``p``'s flavor
+    dimension (``p.shape[-1]``) rather than silently clamping (JAX's default
+    out-of-bounds indexing behaviour).
+    """
+    n = p.shape[-1]
+    fi, fo = int(flavor_in), int(flavor_out)
+    if not (0 <= fi < n):
+        raise ValueError(
+            f"flavor_in={fi} out of range for a {n}-flavor probability matrix "
+            f"(valid indices: 0..{n - 1})"
+        )
+    if not (0 <= fo < n):
+        raise ValueError(
+            f"flavor_out={fo} out of range for a {n}-flavor probability matrix "
+            f"(valid indices: 0..{n - 1})"
+        )
+    return p[..., fo, fi]
 
 
 # --- helpers ----------------------------------------------------------------
+
+
+def _is_concrete(x):
+    """``True`` unless ``x`` is a JAX tracer (i.e. a value under ``jit``/``vmap``/
+    ``grad``).  Gate every eager input-validation check on this: we can only
+    inspect the *value* of a concrete input, never of a traced one -- checking a
+    tracer's value would either raise a ``TracerBoolConversionError`` or (worse)
+    silently bake a spurious concrete branch into the trace.  Under tracing we
+    simply skip the check; validation still happens whenever the same code path
+    runs on concrete inputs (e.g. once at the boundary of a jitted region, or in
+    a pure-Python call).
+
+    Always test concreteness of the *raw* argument, before any ``jax.numpy``
+    conversion -- and, once confirmed concrete, do the actual numeric check with
+    plain ``numpy`` (never ``jax.numpy``).  Under ``jit`` (omnistaging), *every*
+    ``jax.numpy`` op executed while a trace is active is staged into the jaxpr
+    and returns a fresh tracer, even one applied only to concrete/closed-over
+    Python constants unrelated to the traced arguments; using ``jax.numpy`` for
+    the check itself would therefore spuriously produce a tracer (and blow up on
+    ``bool()``) purely from being lexically inside someone else's ``jit``, which
+    is exactly the failure mode this helper exists to avoid.
+    """
+    return not isinstance(x, jax.core.Tracer)
+
+
+def _check_positive(x, name, unit_hint):
+    """Raise if concrete ``x`` has any non-positive entry."""
+    if _is_concrete(x) and _np.any(_np.asarray(x) <= 0):
+        raise ValueError(f"{name} must be positive (units: {unit_hint})")
+
+
+def _check_nonneg(x, name, unit_hint):
+    """Raise if concrete ``x`` has any negative entry."""
+    if _is_concrete(x) and _np.any(_np.asarray(x) < 0):
+        raise ValueError(f"{name} must be non-negative (units: {unit_hint})")
+
+
+def _check_abs_le_one(x, name):
+    """Raise if concrete ``x`` has any entry with magnitude > 1."""
+    if _is_concrete(x) and _np.any(_np.abs(_np.asarray(x)) > 1.0):
+        raise ValueError(
+            f"{name} must satisfy |{name}| <= 1 (it is cos(zenith), dimensionless "
+            "-- not an angle in degrees or radians)"
+        )
+
+
+def _check_flavor_index(idx, n, name):
+    """Raise if the (always-static) flavor index ``idx`` is out of range for an
+    ``n``-flavor ``params``."""
+    if idx is None:
+        return
+    i = int(idx)
+    if not (0 <= i < n):
+        raise ValueError(
+            f"{name}={i} out of range for the {n}-flavor params passed "
+            f"(valid indices: 0..{n - 1})"
+        )
+
 
 def n_flavors(params):
     """Number of neutrino flavors in ``params`` (3 for standard, 4 for 3+1, ...)."""
@@ -60,11 +137,35 @@ def _resolve_backend(params, backend):
 
 def _nsi_matrix(nsi, n_active):
     """Coerce an NSI spec (NSI object or matrix) to an ``(n_active, n_active)``
-    array, or ``None``."""
+    array, or ``None``.
+
+    The :class:`jaxnu.nsi.NSI` dataclass path always builds a Hermitian matrix by
+    construction. A raw matrix has no such guarantee, so it is checked here: a
+    non-Hermitian matter-NSI matrix breaks the unitarity of the propagated
+    amplitude (it silently injects non-physical gain/loss), so it is rejected
+    rather than used as-is.
+    """
     if nsi is None:
         return None
     if hasattr(nsi, "matrix"):
         return nsi.matrix(n_active)
+    # Check concreteness of the *raw* nsi argument, before any jax.numpy
+    # conversion, and do the actual check in plain numpy -- see the docstring
+    # of `_is_concrete` for why: under `jit`, converting via jax.numpy first
+    # and then testing `_is_concrete` on the *result* would spuriously report
+    # "traced" (and a numpy/jnp check on that result would spuriously error)
+    # any time this code merely happens to run lexically inside someone else's
+    # jit trace, regardless of whether `nsi` itself is a traced value.
+    if _is_concrete(nsi):
+        m_np = _np.asarray(nsi, dtype=_np.complex128)
+        if not _np.allclose(m_np, _np.conj(m_np).T, atol=1e-9):
+            raise ValueError(
+                "raw nsi= matrix must be Hermitian (eps_{alpha,beta} == "
+                "conj(eps_{beta,alpha})); a non-Hermitian matter potential "
+                "breaks unitarity of the propagated amplitude. Pass a "
+                "jaxnu.nsi.NSI(...) instance instead if you want this "
+                "enforced by construction."
+            )
     return jnp.asarray(nsi, dtype=jnp.complex128)
 
 
@@ -86,6 +187,12 @@ def probability_constant(params, energy_GeV, baseline_km, density=0.0, ye=0.5,
     when NSI or steriles are present.  Returns a ``(..., N, N)`` matrix, or a
     scalar/1-D array if both ``flavor_in`` and ``flavor_out`` are given.
     """
+    _check_positive(energy_GeV, "energy_GeV", "GeV, not eV")
+    _check_nonneg(baseline_km, "baseline_km", "km, not m")
+    _check_nonneg(density, "density", "g/cm^3")
+    _check_flavor_index(flavor_in, n_flavors(params), "flavor_in")
+    _check_flavor_index(flavor_out, n_flavors(params), "flavor_out")
+
     energy_eV = jnp.asarray(energy_GeV) * C.GEV_TO_EV
     length_invEV = jnp.asarray(baseline_km) * C.KM_TO_INV_EV
     v_cc, v_nc = C.matter_potentials(density, ye)
@@ -134,6 +241,12 @@ def probability_profile(params, energy_GeV, density_gcc, ye, length_km,
     ``density_gcc``, ``ye``, ``length_km`` are 1-D arrays (one entry per
     segment, ordered source -> detector).  ``energy_GeV`` is a scalar or array.
     """
+    _check_positive(energy_GeV, "energy_GeV", "GeV, not eV")
+    _check_nonneg(density_gcc, "density_gcc", "g/cm^3")
+    _check_nonneg(length_km, "length_km", "km, not m")
+    _check_flavor_index(flavor_in, n_flavors(params), "flavor_in")
+    _check_flavor_index(flavor_out, n_flavors(params), "flavor_out")
+
     density_gcc = jnp.asarray(density_gcc)
     ye = jnp.broadcast_to(jnp.asarray(ye), density_gcc.shape)
     v_cc, v_nc = C.matter_potentials(density_gcc, ye)
@@ -197,6 +310,11 @@ def probability_earth(params, energy_GeV, cos_zenith, det_depth_km=0.0,
     probabilities are then differentiable w.r.t. the **shell boundary radii**,
     **densities** and **Y_e** (it overrides ``n_sub`` / ``ye_core`` / ``ye_mantle``).
     """
+    _check_positive(energy_GeV, "energy_GeV", "GeV, not eV")
+    _check_abs_le_one(cos_zenith, "cos_zenith")
+    _check_nonneg(det_depth_km, "det_depth_km", "km, not m")
+    _check_flavor_index(flavor_in, n_flavors(params), "flavor_in")
+    _check_flavor_index(flavor_out, n_flavors(params), "flavor_out")
     u, msq = params.pmns(), params.msquared()
     na = _n_active(params)
     nsi_mat = _nsi_matrix(nsi, na)

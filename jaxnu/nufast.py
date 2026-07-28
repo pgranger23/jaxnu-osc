@@ -1,15 +1,39 @@
 """NuFast-style direct constant-density probability (3-flavor, standard).
 
-Ports the algorithm of Parke & Denton's NuFast-LBL (the DMP "Rosetta" relations):
-the matter mixing-matrix magnitudes ``|U^m_{alpha i}|^2`` and the matter Jarlskog
-are obtained *analytically* from the matter eigenvalues, and plugged straight into
-the standard ``sin^2`` oscillation formula.  No eigenvectors, no complex matrix
-exponential, no matmuls -- just scalar algebra, so it is several times faster than
-the matrix-exponential backends while remaining exact and differentiable.
+Ports the algorithm of Parke & Denton's NuFast-LBL (the DMP "Rosetta" relations,
+Denton & Parke, Phys. Rev. D 110, 113005 (2024), arXiv:2405.02400): the matter
+mixing-matrix magnitudes ``|U^m_{alpha i}|^2`` and the matter Jarlskog are obtained
+*analytically* from the matter eigenvalues, and plugged straight into the standard
+``sin^2`` oscillation formula.  No eigenvectors, no complex matrix exponential, no
+matmuls -- just scalar algebra, so it is several times faster than the
+matrix-exponential backends while remaining exact and differentiable.
 
 Single constant-density layer only (it returns probabilities, not the evolution
 operator, so it cannot be chained across layers) and standard 3-flavor (no NSI /
 steriles).  Use the matrix-exponential backends for those.
+
+Provenance / attribution
+-------------------------
+This module is a close, line-by-line **JAX transcription of the reference C++
+implementation** that Peter Denton and Stephen Parke publish alongside the paper
+above as NuFast-LBL (https://github.com/PeterDenton/NuFast-LBL) -- it is not an
+independent re-derivation from the published formulas alone. The intermediate
+variable names below (``See``, ``Smm``, ``Tee``, ``Tmm``, ``Amatter``, ``Jrr``,
+``Jmatter``, ``lambda2``/``lambda3``, ``Dl21``/``Dl32``/``Dl31``, ``rootAsqB``,
+``ss0``, ``PiInv``, ``Xp2``/``Xp3``, ``D21``/``D32``, ``Pme_TC``/``Pme_TV``, ...)
+track the original C++ source's naming (``Ue2sq``, ``Amatter``, ``See``, ``Smm``,
+``Tee``, ``Tmm``, ``lambda2``/``lambda3``, ``Dlambda21``/``Dlambda31``/
+``Dlambda32``, ``rootAsqB``, ``ss0``, ``Jrr``, ``Jmatter``, ``Xp2``/``Xp3``,
+``PiDlambdaInv``, ``D21``/``D32``, ``triple_sin``, ``Pme_TC``/``Pme_TV``) closely
+enough that this is best described honestly as a port/transliteration into JAX,
+not a clean-room reimplementation from the paper's equations with independent
+structure.
+
+NuFast-LBL is itself released under the MIT License (Copyright (c) 2024 Peter B.
+Denton), so this port is used under the terms of that license; the original
+authors' copyright is credited here and in this repository's top-level
+``README.md``. If you use this backend, please also cite Denton & Parke, Phys.
+Rev. D 110, 113005 (2024) [arXiv:2405.02400], as the original authors request.
 """
 
 from __future__ import annotations
@@ -17,6 +41,24 @@ from __future__ import annotations
 import jax.numpy as jnp
 
 _TWO_PI = 2.0 * jnp.pi
+
+# Relative floor on the 1-2 matter eigenvalue gap, in units of |dm31|.
+# The Rosetta relations give |U^m_{alpha 2}|^2 ~ 1/Dl21, which diverges when the
+# two lower matter eigenstates become exactly degenerate (dm21 -> 0).  The
+# probability itself stays finite because those magnitudes always appear
+# multiplied by s21 = 2 sin^2(Dl21 L/4E) ~ Dl21^2, so the divergence cancels
+# analytically -- but in floating point 1/0 * 0 is NaN, and dm21 = 0 is a
+# perfectly reasonable thing to ask for (vacuum limits, parameter scans that
+# cross zero).  Flooring Dl21 evaluates the exact probability for a system split
+# by 1e-12 |dm31| instead of 0; since P is continuous in dm21 the induced error
+# is O(floor * L/4E), i.e. ~1e-11 rad of phase for a 1300 km baseline.
+_DL21_FLOOR_REL = 1e-12
+
+
+def _safe_sqrt(x):
+    """``sqrt(x)`` with a finite gradient at ``x = 0`` (double-where guard)."""
+    big = x > 0.0
+    return jnp.where(big, jnp.sqrt(jnp.where(big, x, 1.0)), 0.0)
 
 
 def prob_matrix(params, energy_eV, length_invEV, v_cc_eV, anti=False):
@@ -41,7 +83,15 @@ def prob_matrix(params, energy_eV, length_invEV, v_cc_eV, anti=False):
     Um3sq_t = c13sq * s23sq
     Ut2sq_t = s13sq * s12sq * s23sq
     Um2sq_t = (1 - s12sq) * (1 - s23sq)
-    Jrr = jnp.sqrt(Um2sq_t * Ut2sq_t)
+    # Jrr = sqrt(Um2sq_t * Ut2sq_t) factorises as sqrt(...) * |sin(theta13)|.
+    # Written that way the sqrt no longer sits on an argument that vanishes
+    # linearly in s13sq ~ theta13^2, which used to make d/dtheta13 NaN at
+    # theta13 = 0 (a standard null point).  sin(theta13) is used unsigned-safe:
+    # for the physical range theta13 in [0, pi/2] it equals |sin(theta13)|, and
+    # taking it signed makes the derivative at theta13 = 0 the correct one-sided
+    # limit rather than a subgradient.
+    s13 = jnp.sin(params.theta13)
+    Jrr = _safe_sqrt(Um2sq_t * s12sq * s23sq) * s13
     sind, cosd = jnp.sin(delta), jnp.cos(delta)
     Um2sq_t = Um2sq_t + Ut2sq_t - 2 * Jrr * cosd
     Jmatter_t = 8 * Jrr * c13sq * sind
@@ -63,7 +113,12 @@ def prob_matrix(params, energy_eV, length_invEV, v_cc_eV, anti=False):
     lambda3 = (A + 2.0 * rootAsqB * jnp.cos(ss0 / 3.0)) / 3.0
 
     tmp = A - lambda3
-    Dl21 = jnp.sqrt(tmp * tmp - 4.0 * Cc / lambda3)
+    # Floored so that Dl21 > 0 strictly: see _DL21_FLOOR_REL above.  The
+    # double-where also keeps d(sqrt)/dx finite when the discriminant is 0.
+    _disc = tmp * tmp - 4.0 * Cc / lambda3
+    _floor2 = (_DL21_FLOOR_REL * jnp.abs(dm31)) ** 2
+    _big = _disc > _floor2
+    Dl21 = jnp.sqrt(jnp.where(_big, _disc, _floor2))
     lambda2 = 0.5 * (A - lambda3 + Dl21)
     Dl32 = lambda3 - lambda2
     Dl31 = Dl32 + Dl21

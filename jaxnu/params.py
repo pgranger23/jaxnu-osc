@@ -52,7 +52,13 @@ class OscParams:
 
 
 def nufit_no() -> OscParams:
-    """A reasonable NuFIT-5.2-like normal-ordering benchmark point."""
+    """NuFIT 5.1 (2021) normal-ordering best fit, without SK atmospheric data.
+
+    The values below match the NuFIT 5.1 tables digit for digit; note this is
+    5.1 and not 5.2, which quotes dm31 = 2.511e-3, theta23 = 49.1 deg and
+    deltacp = 197 deg.  See Esteban et al., JHEP 09 (2020) 178 and
+    http://www.nu-fit.org.
+    """
     return OscParams(
         theta12=jnp.asarray(0.5836),   # ~33.4 deg
         theta13=jnp.asarray(0.1495),   # ~8.57 deg
