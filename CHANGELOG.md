@@ -17,6 +17,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   piecewise-constant shells and is *not* smoothed away; the helper exists so
   that gradient-based optimizers which move `cos θ_z` bin edges continuously
   can avoid parking an edge on one of them.
+- **`benchmarks/demo_tomography_fisher.py`** — a self-contained end-to-end
+  example: PREM shell densities → chord geometry → oscillation probability →
+  atmospheric flux → `(E, cos θ_z)` histogram → detector response matrix →
+  marginalized Poisson Fisher information → σ(ln ρ_core), all from one
+  `jacfwd`. It then differentiates that σ *through the matrix inverse* with
+  respect to the detector's angular resolution, giving an experimental-design
+  derivative (`∂σ/∂σ_cosθ = 0.1195`, matching central differences to five
+  significant figures). Intended as a demonstration of the machinery, not a
+  sensitivity forecast — the detector model is a placeholder.
 - **`benchmarks/`** — the timing, precision and BSM-limit scripts behind the
   numbers quoted in the accompanying paper, so they can be reproduced from a
   clone of this repository rather than only from the authors' analysis code.

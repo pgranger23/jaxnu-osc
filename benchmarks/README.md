@@ -25,13 +25,14 @@ Drop `JAX_PLATFORMS=cpu` to let JAX pick up a visible GPU/TPU.
 
 | script | measures | paper table / figure |
 |---|---|---|
+| `demo_tomography_fisher.py` | End-to-end composability demo: propagates the density derivatives through an atmospheric flux, an (E, cos theta) histogram, a Gaussian detector response and a marginalized Poisson Fisher matrix to a tomographic sigma(ln rho_core), then differentiates that sigma through the matrix inverse with respect to the angular resolution. A demonstration of the machinery, **not** a sensitivity forecast | Section "A worked example: tomographic sensitivity end to end" |
 | `check_bsm_limits.py` | NSI/sterile decoupling limits, unitarity, and AD-vs-finite-difference checks for the beyond-standard-model front-ends (no independent reference code exists for these, so they are validated against exact analytic limits instead) | Table "Validation of the NSI and sterile sectors through exact limits and gradient checks" |
 | `bench_backends_and_precision.py timing` | forward-evaluation throughput of the four propagation backends (`cayley`, `eigh`, `expm`, `nufast`) at constant density, plus the PREM Earth forward pass and its full 6-parameter gradient, run standalone (independent of the plotting script below) | Table "Backend performance per energy point" (the CPU column; run again on a GPU host for the A100 column) |
 | `bench_backends_and_precision.py grad` | autodiff vs. central finite differences for all three derivative classes claimed in the paper: oscillation parameters (θ13, θ23, δCP, Δm²31), geometry (cos θ_z, atmospheric production height), and matter density (core/mantle log-density scale factors) | the "10⁻⁸ level or better" gradient-validation claim (Validation section) |
 | `bench_backends_and_precision.py prec` | float32 vs float64 agreement for a PREM oscillogram, quantifying why float64 is mandatory | the "double precision is mandatory" claim (Units and precision, `README.md`) |
 | `bench_timing_and_gradients.py` | (a) the same backend timing rows as above but self-contained in one script including the NuFast port, and (b) `∂P/∂ln ρ` oscillograms for the core and mantle density — the matter-density tomography derivative that no analytic constant-density code (NuFast, Prob3++, ...) can supply | Table "Backend performance per energy point" (self-contained cross-check) and the density-derivative figure discussed in the Introduction/BSM sections |
 
-`check_bsm_limits.py` runs in well under a second. The other two scripts do
+`check_bsm_limits.py` runs in well under a second; `demo_tomography_fisher.py` takes a couple of minutes on CPU (900 bins x 6 parameters through the layered Earth). The other two scripts do
 real batched JAX work; see **Measured runtimes** below.
 
 ## Hardware dependence
@@ -79,6 +80,8 @@ already visible at `NG=40`.
   `gpu`/`tpu` depending on what JAX picked up).
 - `output/jaxnu_bench2_grad.json` — AD-vs-finite-difference deviations from
   `bench_backends_and_precision.py grad`.
+- `tomography_fisher.npz` — Fisher matrix, covariance and per-bin
+  expected counts from `demo_tomography_fisher.py`.
 - `output/jaxnu_bench2_prec.json` — float32-vs-float64 deviations from
   `bench_backends_and_precision.py prec`.
 
