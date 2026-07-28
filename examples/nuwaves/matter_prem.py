@@ -52,4 +52,10 @@ cbar = fig.colorbar(axs.flat[0].collections[0], ax=axs, location="right",
                     fraction=0.05, pad=0.03)
 cbar.set_label("Oscillation probability", fontsize=12)
 plt.savefig(FIGDIR / "matter_prem_test.jpg", dpi=140)
+# also emit a lossless high-resolution copy: the JPEG is fine on screen but
+# its compression puts ringing artefacts into the fine near-horizon fringes,
+# which is exactly the structure the figure exists to show.  (A vector PDF is
+# possible too but pcolormesh emits one path per cell, giving a multi-MB file
+# that older pdfTeX cannot embed; 400 dpi lossless is the practical choice.)
+plt.savefig(FIGDIR / "matter_prem_test.png", dpi=400)
 print("saved", FIGDIR / "matter_prem_test.jpg")

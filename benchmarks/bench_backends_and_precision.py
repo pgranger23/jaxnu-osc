@@ -139,7 +139,13 @@ elif MODE == "grad":
     # CPU node.
     NE = 24
     Ee = jnp.linspace(1.0, 20.0, NE)
-    cze = jnp.linspace(-0.999, -0.2, NE)   # keep cz+-h inside [-1,1] for the FD check
+    # Include the nadir endpoint cz = -1 exactly.  That point is where the
+    # geometry gradient used to be silently halved by a clip tie, so excluding
+    # it from the AD-vs-FD table (as an earlier version of this script did, to
+    # keep cz +- h inside [-1, 1]) is exactly the wrong choice: it is the point
+    # most worth checking.  Central differences cannot step past -1, so the cz
+    # row uses a one-sided difference taken from the physical side there.
+    cze = jnp.concatenate([jnp.array([-1.0]), jnp.linspace(-0.999, -0.2, NE - 1)])
     table = _osc._earth.shell_table(4)
 
     def prob_full(p, cz_, h_km, sc_core, sc_mantle, e_gev):
@@ -182,8 +188,16 @@ elif MODE == "grad":
             c if x0 is None else x0, e, c)))
         ad = np.asarray(gfun(Ee, cze))
 
-        def fd_one(e, c, f=f, x0=x0, h=h):
+        def fd_one(e, c, f=f, x0=x0, h=h, kind=kind):
             x = c if x0 is None else x0
+            if kind == "cz":
+                # one-sided from the physical side wherever cz - h would leave
+                # [-1, 1]; second-order accurate three-point forward formula.
+                inside = x - h >= -1.0
+                central = (f(x + h, e, c) - f(x - h, e, c)) / (2 * h)
+                forward = (-3 * f(x, e, c) + 4 * f(x + h, e, c)
+                           - f(x + 2 * h, e, c)) / (2 * h)
+                return jnp.where(inside, central, forward)
             return (f(x + h, e, c) - f(x - h, e, c)) / (2 * h)
         fd = np.asarray(jax.jit(jax.vmap(fd_one))(Ee, cze))
         num = np.abs(ad - fd).max()

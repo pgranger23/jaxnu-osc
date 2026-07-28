@@ -237,6 +237,16 @@ def _figure(Jn, mun, per_bin, frac_info, s0, dsdr, frac_bins_pct):
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
+    # The figure is placed at \textwidth (~6.3 in) in a single-column journal
+    # layout, so a 16.5 in canvas is scaled down by ~0.38.  Default 10 pt labels
+    # would print at under 4 pt.  Scale the fonts up so they land at ~9-10 pt on
+    # paper, and keep the canvas modest so the scale factor is small.
+    plt.rcParams.update({
+        "font.size": 17, "axes.titlesize": 19, "axes.labelsize": 17,
+        "xtick.labelsize": 15, "ytick.labelsize": 15, "legend.fontsize": 14,
+        "axes.linewidth": 1.2, "lines.linewidth": 2.0,
+    })
+
     E = np.asarray(E_C).reshape(N_E, N_CZ)
     CZ = np.asarray(CZ_C).reshape(N_E, N_CZ)
     dmu = Jn[:, 0].reshape(N_E, N_CZ)
