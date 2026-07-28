@@ -32,7 +32,7 @@ Drop `JAX_PLATFORMS=cpu` to let JAX pick up a visible GPU/TPU.
 | `bench_backends_and_precision.py prec` | float32 vs float64 agreement for a PREM oscillogram, quantifying why float64 is mandatory | the "double precision is mandatory" claim (Units and precision, `README.md`) |
 | `bench_timing_and_gradients.py` | (a) the same backend timing rows as above but self-contained in one script including the NuFast port, and (b) `∂P/∂ln ρ` oscillograms for the core and mantle density — the matter-density tomography derivative that no analytic constant-density code (NuFast, Prob3++, ...) can supply | Table "Backend performance per energy point" (self-contained cross-check) and the density-derivative figure discussed in the Introduction/BSM sections |
 
-`check_bsm_limits.py` runs in well under a second; `demo_tomography_fisher.py` takes a couple of minutes on CPU (900 bins x 6 parameters through the layered Earth). The other two scripts do
+`check_bsm_limits.py` takes about 35 s on CPU, almost all of it JIT warm-up rather than arithmetic; `demo_tomography_fisher.py` takes a couple of minutes on CPU (900 bins x 6 parameters through the layered Earth). The other two scripts do
 real batched JAX work; see **Measured runtimes** below.
 
 ## Hardware dependence

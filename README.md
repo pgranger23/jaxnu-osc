@@ -479,7 +479,7 @@ jaxnu/
 - **PREM.** Dziewonski & Anderson, *Phys. Earth Planet. Inter.* **25** (1981) 297.
   `jaxnu/earth.py` implements the PREM density as piecewise polynomials in
   radius, from the coefficients tabulated in that paper.
-- **NuFast / DMP.** Denton & Parke, *Phys. Rev. D* **110** (2024) 113005
+- **NuFast / DMP.** Denton & Parke, *Phys. Rev. D* **110** (2024) 073005
   (arXiv:2405.02400); see also Denton, Minakata & Parke (arXiv:1604.08167) for
   the underlying "Rosetta" relations. `jaxnu/nufast.py`'s `nufast` backend is a
   **close, line-by-line JAX transcription of the reference C++ implementation**

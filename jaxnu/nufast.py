@@ -1,7 +1,7 @@
 """NuFast-style direct constant-density probability (3-flavor, standard).
 
 Ports the algorithm of Parke & Denton's NuFast-LBL (the DMP "Rosetta" relations,
-Denton & Parke, Phys. Rev. D 110, 113005 (2024), arXiv:2405.02400): the matter
+Denton & Parke, Phys. Rev. D 110, 073005 (2024), arXiv:2405.02400): the matter
 mixing-matrix magnitudes ``|U^m_{alpha i}|^2`` and the matter Jarlskog are obtained
 *analytically* from the matter eigenvalues, and plugged straight into the standard
 ``sin^2`` oscillation formula.  No eigenvectors, no complex matrix exponential, no
@@ -33,7 +33,7 @@ NuFast-LBL is itself released under the MIT License (Copyright (c) 2024 Peter B.
 Denton), so this port is used under the terms of that license; the original
 authors' copyright is credited here and in this repository's top-level
 ``README.md``. If you use this backend, please also cite Denton & Parke, Phys.
-Rev. D 110, 113005 (2024) [arXiv:2405.02400], as the original authors request.
+Rev. D 110, 073005 (2024) [arXiv:2405.02400], as the original authors request.
 """
 
 from __future__ import annotations
