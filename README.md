@@ -491,7 +491,8 @@ jaxnu/
   Denton); this port is used under the terms of that license, with the original
   authors' copyright credited here and in `jaxnu/nufast.py`'s module docstring.
   If you use the `nufast` backend, please also cite Denton & Parke (2024) as the
-  original authors request.
+  original authors request. The NuFast-LBL MIT licence is reproduced verbatim in
+  [`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md), as its terms require.
 - Validated against [OscProb](https://github.com/joaoabcoelho/OscProb) and
   [NuFast](https://github.com/PeterDenton); reproduces
   [nu-waves](https://github.com/nadrino/nu-waves) reference plots (see

@@ -26,6 +26,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   derivative (`∂σ/∂σ_cosθ = 0.1195`, matching central differences to five
   significant figures). Intended as a demonstration of the machinery, not a
   sensitivity forecast — the detector model is a placeholder.
+- **`THIRD_PARTY_LICENSES.md`** — retains the upstream copyright and licence
+  text for incorporated third-party material, as those licences require. In
+  particular the NuFast-LBL MIT licence (Copyright (c) 2024 Peter B. Denton) is
+  now reproduced verbatim; previously only a prose credit existed, which does
+  not satisfy the MIT notice-retention condition. Also documents PREM, the BS05
+  solar tables and nu-waves.
+- **Marginalization breakdown in `demo_tomography_fisher.py`** — reports which
+  nuisances actually drive the degradation in sigma(ln rho_core), and labels the
+  per-bin information split explicitly as a decomposition of the nuisance-fixed
+  F_00.
 - **`benchmarks/`** — the timing, precision and BSM-limit scripts behind the
   numbers quoted in the accompanying paper, so they can be reproduced from a
   clone of this repository rather than only from the authors' analysis code.

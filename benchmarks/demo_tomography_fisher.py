@@ -153,6 +153,20 @@ def main():
         print(f"{LABELS[i]:<18s} {fixed:>13.4f}   {marg:>12.4f}   "
               f"{marg/fixed:>8.2f}x")
 
+    # which nuisances actually cost us? (Schur complement over subsets)
+    def marg(keep):
+        """sigma(par 0) marginalizing only over the indices in `keep`."""
+        idx = [0] + sorted(keep)
+        sub = F[np.ix_(idx, idx)]
+        return np.sqrt(np.linalg.inv(sub)[0, 0])
+
+    print("\nwhere the marginalization cost comes from:")
+    print(f"  all other parameters fixed          : {1/np.sqrt(F[0,0]):.4f}")
+    print(f"  marginalize flux only (5,6)         : {marg([4, 5]):.4f}")
+    print(f"  marginalize theta23, dm31 only (3,4): {marg([2, 3]):.4f}")
+    print(f"  marginalize ln rho_mantle only      : {marg([1]):.4f}")
+    print(f"  marginalize everything              : {np.sqrt(cov[0,0]):.4f}")
+
     # where does the core information actually come from?
     Jn = np.asarray(J)
     mun = np.asarray(mu)
@@ -163,7 +177,10 @@ def main():
     frac_evts = mun[core_mask].sum() / mun.sum()
     print(f"\ncore-crossing bins (cos theta_z < {CORE_CZ:.4f}):")
     print(f"  {frac_bins*100:.1f}% of bins, {frac_evts*100:.1f}% of events, "
-          f"but {frac_info*100:.1f}% of the ln rho_core information")
+          f"but {frac_info*100:.1f}% of F_00")
+    print("  (F_00 is the NUISANCE-FIXED information on ln rho_core -- that is "
+          "the\n   quantity that decomposes additively over bins; the "
+          "marginalized\n   information does not split this way.)")
 
     print(f"\nstatistical scaling: sigma(ln rho_core) = "
           f"{np.sqrt(cov[0,0])*np.sqrt(N_EVENTS/1e5):.4f} "

@@ -28,3 +28,8 @@ env/
 # Solar SSM table is downloaded by the example if missing; the bundled copy is
 # tracked, but local downloads elsewhere are not.
 examples/data/ssm/
+
+# benchmark outputs
+benchmarks/output/
+tomography_fisher.npz
+*.npz
