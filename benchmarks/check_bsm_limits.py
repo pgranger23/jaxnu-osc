@@ -90,3 +90,21 @@ print(f"3+1 RAA vacuum depth vs 1-sin^2(2t14) : {d3:.2e}")
 print(f"3+1 in PREM matter, unitarity         : {d4:.2e}")
 print(f"AD vs FD, d/dtheta14 (PREM, 3+1)      : {d5:.2e}")
 print(f"AD vs FD, d/deps_ee (NSI, constant)   : {d6:.2e}")
+
+# --- decoherence and non-unitary mixing (added with the v0.2.0 sectors) ------
+from jaxnu import decoherence as dc, nonunitarity as nu
+Egrid = jnp.linspace(0.5, 5.0, 12)
+std = np.asarray(probability_constant(p, Egrid, 1300.0, density=2.8))
+d7 = float(np.abs(np.asarray(dc.probability(p, Egrid, 1300.0, dc.Decoherence(),
+                                            density=2.8)) - std).max())
+d8 = float(np.abs(np.asarray(dc.probability(p, Egrid, 1300.0,
+            dc.WavePacket(sigma_x_m=1e10), density=2.8)) - std).max())
+d9 = float(np.abs(np.asarray(nu.probability(p, nu.NonUnitarity(), Egrid, 1300.0,
+                                            density=2.8)) - std).max())
+_big = dc.Decoherence(gamma21=1e-12, gamma31=1e-12, gamma32=1e-12)
+d10 = float(np.abs(np.asarray(dc.probability(p, Egrid, 1300.0, _big,
+                                             density=2.8)).sum(axis=-2) - 1.0).max())
+print(f"Lindblad gamma->0 recovers standard   : {d7:.2e}")
+print(f"wave packet sigma_x->inf recovers std : {d8:.2e}")
+print(f"non-unitary alpha->0 recovers standard: {d9:.2e}")
+print(f"strongly damped, unitarity preserved  : {d10:.2e}")
