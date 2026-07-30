@@ -19,13 +19,38 @@ is an experimental-design derivative with no analytic counterpart at all.
 
 This is a DEMONSTRATION OF THE MACHINERY, not a sensitivity forecast.  The
 "detector" is a placeholder: unit efficiency, Gaussian energy/angle smearing
-with no tails, muon neutrinos only, no antineutrinos, no atmospheric-flux
-shape uncertainty beyond the two nuisances below.  Absolute numbers should be
-read only as scaling with the stated event count.
+with no tails, no atmospheric-flux shape uncertainty beyond the nuisances
+below, no backgrounds.  Absolute numbers should be read only as scaling with
+the stated event count.
 
-Run:  python demo_tomography_fisher.py
+Earth model (default): the density is parametrized by N_ZONES=6 independent
+radial scale factors -- inner core, outer core, lower mantle, transition
+zone, upper mantle, crust -- built on ``jaxnu.earth.LayeredEarth`` (every
+per-shell density is a differentiable input).  This replaces an earlier
+2-parameter (core/mantle) version, which a referee correctly flagged as
+removing the inter-shell degeneracies that dominate a real inversion: with
+only two density parameters sigma(ln rho_core) came out an order of
+magnitude tighter than published forecasts for the same MSW mechanism.  The
+6-zone model reproduces that "tens of percent" regime (see the module
+docstring numbers logged by ``main()``) and exposes the degeneracy directly
+in the zone-zone correlation matrix (figure panel (d)).
+
+The sample includes both neutrinos and antineutrinos by default (matter
+effects differ in sign for the two; jaxnu's propagator takes ``anti=True``
+natively), sharing the density and oscillation parameters but each with its
+own flux normalization.
+
+Both realism changes are controlled by environment variables so the original
+2-zone, neutrino-only configuration remains reproducible for comparison:
+
+    N_ZONES=2 INCLUDE_ANTINU=0 python demo_tomography_fisher.py
+
+reproduces the original 2-parameter result to the last stated digit.
+
+Run:  python demo_tomography_fisher.py   (defaults: N_ZONES=6, antinu on)
 """
 
+import os
 import numpy as np
 import jax
 import jax.numpy as jnp
@@ -33,22 +58,90 @@ import dataclasses
 
 import jaxnu
 import jaxnu.oscillator as _osc
+import jaxnu.earth as _earth
 from jaxnu import constants as C, nufit_no
 
+# --- realism toggles (env vars so the old configuration stays reproducible) --
+N_ZONES = int(os.environ.get("N_ZONES", "6"))
+INCLUDE_ANTINU = bool(int(os.environ.get("INCLUDE_ANTINU", "1")))
+
 # --- toy exposure ------------------------------------------------------------
-N_EVENTS = 1.0e5          # total muon-neutrino events in the sample
+N_EVENTS = 1.0e5          # nu_mu events in the sample (nubar sits on top of this)
+NUBAR_FRAC = 0.5          # toy nubar/nu event-count ratio (order-of-magnitude
+                           # atmospheric nu_mu:nubar_mu correct; not a fit target)
 E_MIN, E_MAX, N_E = 1.0, 30.0, 30       # GeV
 CZ_MIN, CZ_MAX, N_CZ = -1.0, -0.05, 30  # up-going only
 GAMMA, E_PIVOT = 2.7, 10.0              # atmospheric power law
 H_ATM_KM = 15.0
 CORE_CZ = -0.8376384419020163           # chord grazes the core-mantle boundary
+N_BINS = N_E * N_CZ
 
-_TABLE = _osc._earth.shell_table(4)
 _P0 = nufit_no()
 
-# parameter vector: [ln rho_core, ln rho_mantle, theta23, dm31, ln Phi0, dgamma]
-THETA0 = jnp.array([0.0, 0.0, float(_P0.theta23), float(_P0.dm31), 0.0, 0.0])
-LABELS = ["ln rho_core", "ln rho_mantle", "theta23", "dm31", "ln Phi0", "dgamma"]
+# --- zoned, fully differentiable Earth (jaxnu.earth.LayeredEarth) ------------
+# n_sub=4 matches the shell count used by the original shell_table(4) (43
+# shells), so the per-bin propagation cost is unchanged; only the number of
+# *free parameters* controlling the shell densities changes.
+_BASE_EARTH = _earth.prem_layered(n_sub=4)
+
+
+def _zone_edges(n_zones):
+    if n_zones == 2:
+        # original split: core / mantle, boundary at the core-mantle radius
+        return np.array([0.0, _earth.CORE_RADIUS_KM, C.R_EARTH_KM])
+    if n_zones == 6:
+        # inner core / outer core / lower mantle / transition zone /
+        # upper mantle / crust -- PREM region boundaries grouped into six
+        # radial zones
+        return np.array([0.0, 1221.5, 3480.0, 5701.0, 5971.0, 6346.6,
+                         C.R_EARTH_KM])
+    raise ValueError(f"no zone table defined for N_ZONES={n_zones}")
+
+
+def _zone_index(base_earth, n_zones):
+    """Static (numpy) per-shell zone index, built once from shell mid-radii."""
+    outer = np.asarray(base_earth.outer)
+    inner = np.concatenate([[0.0], outer[:-1]])
+    mid = 0.5 * (inner + outer)
+    edges = _zone_edges(n_zones)
+    idx = np.searchsorted(edges, mid, side="right") - 1
+    return jnp.asarray(np.clip(idx, 0, n_zones - 1))
+
+
+_ZONE_IDX = _zone_index(_BASE_EARTH, N_ZONES)
+_ZONE_EDGES_KM = _zone_edges(N_ZONES)
+ZONE_LABELS = {
+    2: ["ln rho_core", "ln rho_mantle"],
+    6: ["ln rho_inner_core", "ln rho_outer_core", "ln rho_lower_mantle",
+        "ln rho_transition_zone", "ln rho_upper_mantle", "ln rho_crust"],
+}[N_ZONES]
+
+# parameter vector: [ln_sc_zone_0 .. ln_sc_zone_{N-1}, theta23, dm31,
+#                     ln Phi0_nu, dgamma, ln Phi0_nubar]
+N_DENS = N_ZONES
+IDX_TH23, IDX_DM31, IDX_PHI, IDX_DGAMMA, IDX_PHIBAR = (
+    N_DENS, N_DENS + 1, N_DENS + 2, N_DENS + 3, N_DENS + 4)
+N_PAR = N_DENS + 5 if INCLUDE_ANTINU else N_DENS + 4
+
+THETA0 = jnp.zeros(N_PAR).at[IDX_TH23].set(float(_P0.theta23)) \
+                         .at[IDX_DM31].set(float(_P0.dm31))
+LABELS = (ZONE_LABELS + ["theta23", "dm31", "ln Phi0_nu", "dgamma"]
+          + (["ln Phi0_nubar"] if INCLUDE_ANTINU else []))
+
+# "bulk core" direction: the uniform scaling of whichever zones make up the
+# physical core (density > 9 g/cc / r < 3480 km) -- the direct analogue of
+# the original single ln_rho_core parameter.  For N_ZONES=2 that is zone 0
+# alone (the whole core is one parameter); for N_ZONES=6 it is zones 0+1
+# (inner + outer core).  NOT "the first two zones" in general -- zone 1 is
+# "mantle" in the 2-zone config, so summing zones 0+1 there would silently
+# mean "the whole Earth", not "the core".  Used for the headline sigma, the
+# figure panels, and the design derivative, so the new numbers stay
+# comparable in kind to the old ones.
+CORE_ZONE_IDXS = {2: [0], 6: [0, 1]}.get(N_ZONES, [0])
+BULK_CORE_VEC = jnp.zeros(N_PAR)
+for _i in CORE_ZONE_IDXS:
+    BULK_CORE_VEC = BULK_CORE_VEC.at[_i].set(1.0)
+IS_MULTI_ZONE_CORE = len(CORE_ZONE_IDXS) > 1
 
 
 def _bin_centres():
@@ -67,32 +160,58 @@ def _bin_centres():
 E_C, CZ_C, DOMEGA = _bin_centres()
 
 
-def _prob_mumu(e_gev, cz, sc_core, sc_mantle, params):
-    """P(nu_mu -> nu_mu) with the core and mantle densities scaled."""
-    rho, ye, L = _osc._earth.chord_segments(cz, _TABLE, h_atm_km=H_ATM_KM,
-                                            det_depth_km=0.0)
-    core = rho > 9.0                       # PREM: outer core >= 9.9 g/cm^3
-    rho_s = rho * jnp.where(core, sc_core, sc_mantle)
-    v_cc, _ = C.matter_potentials(rho_s, ye)
+def _prob_mumu(e_gev, cz, ln_sc, params, anti):
+    """P(nu_mu -> nu_mu) [or nubar_mu -> nubar_mu] with per-zone density scale."""
+    sc = jnp.exp(ln_sc)                          # (N_ZONES,)
+    density = _BASE_EARTH.density * sc[_ZONE_IDX]
+    model = dataclasses.replace(_BASE_EARTH, density=density)
+    rho, ye, L = _earth.layered_chord_segments(model, cz, h_atm_km=H_ATM_KM,
+                                                det_depth_km=0.0)
+    v_cc, _ = C.matter_potentials(rho, ye)
     s = _osc.propagate_layers(params.pmns(), params.msquared(),
                               e_gev * C.GEV_TO_EV, v_cc,
-                              L * C.KM_TO_INV_EV, anti=False, backend="cayley")
+                              L * C.KM_TO_INV_EV, anti=anti, backend="cayley")
     return _osc.prob_from_amplitude(s)[1, 1]
 
 
-def _shape(theta):
-    """Un-normalized expected counts per bin (the full forward model)."""
-    ln_rc, ln_rm, th23, dm31, ln_phi, dgamma = theta
+def _shape_nu(theta):
+    """Un-normalized expected nu_mu counts per bin."""
+    ln_sc = theta[:N_DENS]
+    th23, dm31, ln_phi, dgamma = (theta[IDX_TH23], theta[IDX_DM31],
+                                  theta[IDX_PHI], theta[IDX_DGAMMA])
     p = dataclasses.replace(_P0, theta23=th23, dm31=dm31)
     prob = jax.vmap(_prob_mumu, in_axes=(0, 0, None, None, None))(
-        E_C, CZ_C, jnp.exp(ln_rc), jnp.exp(ln_rm), p)
+        E_C, CZ_C, ln_sc, p, False)
     flux = jnp.exp(ln_phi) * (E_C / E_PIVOT) ** (-(GAMMA + dgamma))
     return flux * prob * DOMEGA
 
 
-# absolute normalization is fixed once, at the nominal point, so that the
-# flux-norm nuisance is a genuine free parameter rather than a definition
-_NORM = float(N_EVENTS / jnp.sum(_shape(THETA0)))
+def _shape_nubar(theta):
+    """Un-normalized expected nubar_mu counts per bin (anti=True)."""
+    ln_sc = theta[:N_DENS]
+    th23, dm31, dgamma, ln_phibar = (theta[IDX_TH23], theta[IDX_DM31],
+                                     theta[IDX_DGAMMA], theta[IDX_PHIBAR])
+    p = dataclasses.replace(_P0, theta23=th23, dm31=dm31)
+    prob = jax.vmap(_prob_mumu, in_axes=(0, 0, None, None, None))(
+        E_C, CZ_C, ln_sc, p, True)
+    # spectral index shared with nu (kept minimal); normalization independent
+    flux = jnp.exp(ln_phibar) * (E_C / E_PIVOT) ** (-(GAMMA + dgamma))
+    return flux * prob * DOMEGA
+
+
+def _shape(theta):
+    """Un-normalized counts, nu block then nubar block (or nu only)."""
+    if not INCLUDE_ANTINU:
+        return _shape_nu(theta)
+    return jnp.concatenate([_shape_nu(theta), _shape_nubar(theta)])
+
+
+# absolute normalization is fixed once, at the nominal point, per species, so
+# that the flux-norm nuisances are genuine free parameters rather than
+# definitions
+_NORM_NU = float(N_EVENTS / jnp.sum(_shape_nu(THETA0)))
+_NORM_BAR = (float(NUBAR_FRAC * N_EVENTS / jnp.sum(_shape_nubar(THETA0)))
+            if INCLUDE_ANTINU else 0.0)
 
 
 RES_LNE = 0.20      # energy resolution, fractional (Gaussian in ln E)
@@ -105,7 +224,8 @@ def response(res_lne, res_cz):
     A Gaussian smearing kernel in (ln E, cos theta_z), column-normalized so it
     conserves events.  Nothing here is special -- the point is only that it is
     a JAX function of the resolution widths, so those widths are differentiable
-    inputs like any other.
+    inputs like any other.  The same detector response applies to the nu and
+    nubar samples (same reconstruction).
     """
     dlne = jnp.log(E_C)[:, None] - jnp.log(E_C)[None, :]
     dcz = CZ_C[:, None] - CZ_C[None, :]
@@ -113,8 +233,24 @@ def response(res_lne, res_cz):
     return R / jnp.sum(R, axis=0, keepdims=True)
 
 
+def _apply_response_block(R, x):
+    """Apply the (n_bins x n_bins) response to a (possibly nu+nubar) stack.
+
+    ``x`` has leading dimension ``N_BINS`` (nu only) or ``2*N_BINS`` (nu then
+    nubar); the response never mixes species, so it applies block-wise.
+    """
+    if not INCLUDE_ANTINU:
+        return R @ x
+    return jnp.concatenate([R @ x[:N_BINS], R @ x[N_BINS:]], axis=0)
+
+
 def counts(theta, res_lne=RES_LNE, res_cz=RES_CZ):
-    return response(res_lne, res_cz) @ (_NORM * _shape(theta))
+    R = response(res_lne, res_cz)
+    c_nu = R @ (_NORM_NU * _shape_nu(theta))
+    if not INCLUDE_ANTINU:
+        return c_nu
+    c_bar = R @ (_NORM_BAR * _shape_nubar(theta))
+    return jnp.concatenate([c_nu, c_bar])
 
 
 def fisher(theta, res_lne=RES_LNE, res_cz=RES_CZ):
@@ -128,111 +264,176 @@ def _true_space():
     """mu and dmu/dtheta BEFORE the response matrix, computed once.
 
     The response matrix depends on the resolutions but not on theta, and it
-    enters linearly, so mu(res) = R(res) @ mu_true and J(res) = R(res) @ J_true.
-    Factoring it out this way turns a resolution scan -- which would otherwise
-    need a full jacfwd through the layered Earth per point -- into a sequence of
-    small matrix products.
+    enters linearly (block-wise per species), so mu(res) = R(res) @ mu_true
+    and J(res) = R(res) @ J_true within each species block.  Factoring it out
+    this way turns a resolution scan -- which would otherwise need a full
+    jacfwd through the layered Earth per point -- into a sequence of small
+    matrix products.
     """
-    mu_true = _NORM * _shape(THETA0)
-    J_true = _NORM * jax.jacfwd(_shape)(THETA0)
-    return mu_true, J_true
+    mu_true_nu = _NORM_NU * _shape_nu(THETA0)
+    J_true_nu = _NORM_NU * jax.jacfwd(_shape_nu)(THETA0)
+    if not INCLUDE_ANTINU:
+        return mu_true_nu, J_true_nu
+    mu_true_bar = _NORM_BAR * _shape_nubar(THETA0)
+    J_true_bar = _NORM_BAR * jax.jacfwd(_shape_nubar)(THETA0)
+    return (jnp.concatenate([mu_true_nu, mu_true_bar]),
+            jnp.concatenate([J_true_nu, J_true_bar]))
 
 
-def sigma_from_response(res_cz, mu_true, J_true, res_lne=RES_LNE):
-    """sigma(ln rho_core) for a given angular resolution, reusing the true-space
+def sigma_from_response(res_cz, mu_true, J_true, v=BULK_CORE_VEC, res_lne=RES_LNE):
+    """sigma(v . theta) for a given angular resolution, reusing the true-space
     Jacobian.  Must agree with sigma_core() below, which recomputes everything."""
     R = response(res_lne, res_cz)
-    mu = R @ mu_true
-    J = R @ J_true
+    mu = _apply_response_block(R, mu_true)
+    J = _apply_response_block(R, J_true)
     F = J.T @ (J / mu[:, None])
-    return float(jnp.sqrt(jnp.linalg.inv(F)[0, 0]))
+    return float(jnp.sqrt(v @ jnp.linalg.inv(F) @ v))
 
 
-def sigma_core(res_cz, res_lne=RES_LNE):
-    """Marginalized sigma(ln rho_core) as a function of angular resolution.
+def sigma_core(res_cz, res_lne=RES_LNE, v=BULK_CORE_VEC):
+    """Marginalized sigma(v . theta) as a function of angular resolution.
 
     Differentiating THIS is the composability claim in one line: the gradient
     runs through the oscillation probability, the flux, the histogram, the
-    response matrix, the Fisher matrix and its inverse.
+    response matrix, the Fisher matrix and its inverse.  Defaults to the
+    "bulk core" direction (inner + outer core), the direct analogue of the
+    original single ln_rho_core parameter.
     """
     mu = counts(THETA0, res_lne, res_cz)
     J = jax.jacfwd(counts)(THETA0, res_lne, res_cz)
     F = J.T @ (J / mu[:, None])
-    return jnp.sqrt(jnp.linalg.inv(F)[0, 0])
+    return jnp.sqrt(v @ jnp.linalg.inv(F) @ v)
 
 
 def main():
-    print(f"grid: {N_E} x {N_CZ} = {N_E*N_CZ} bins, {N_EVENTS:.0e} events, "
-          f"up-going nu_mu only")
+    print(f"grid: {N_E} x {N_CZ} = {N_BINS} bins per species, "
+          f"N_ZONES={N_ZONES}, INCLUDE_ANTINU={INCLUDE_ANTINU}, "
+          f"n_par={N_PAR}")
+    if N_DENS == 6:
+        print("zone radial ranges (km): " + ", ".join(
+            f"{lbl.replace('ln rho_', '')}=[{lo:.1f},{hi:.1f}]"
+            for lbl, lo, hi in zip(ZONE_LABELS, _ZONE_EDGES_KM[:-1],
+                                   _ZONE_EDGES_KM[1:])))
+
     F, mu, J = fisher(THETA0)
     F = np.asarray(F)
     cov = np.linalg.inv(F)
+    Jn = np.asarray(J)
+    mun = np.asarray(mu)
 
     print(f"\ntotal events check: {float(jnp.sum(mu)):.1f}")
-    print("\n                      sigma (stat only)")
-    print("parameter          fixed nuisances   marginalized    penalty")
-    for i in (0, 1):
+
+    print("\n                             sigma (stat only)")
+    print("parameter                fixed nuisances   marginalized    penalty")
+    for i in range(N_DENS):
         fixed = 1.0 / np.sqrt(F[i, i])
         marg = np.sqrt(cov[i, i])
-        print(f"{LABELS[i]:<18s} {fixed:>13.4f}   {marg:>12.4f}   "
+        print(f"{LABELS[i]:<24s} {fixed:>13.4f}   {marg:>12.4f}   "
               f"{marg/fixed:>8.2f}x")
 
-    # which nuisances actually cost us? (Schur complement over subsets)
+    # --- the headline number: bulk core, same physical region the original
+    # 2-parameter model's single ln_rho_core covered (zone 0 alone for
+    # N_ZONES=2; zones 0+1 = inner+outer core for N_ZONES=6) ----------------
+    v = np.asarray(BULK_CORE_VEC)
+    core_zone_names = " + ".join(LABELS[i] for i in CORE_ZONE_IDXS)
+    bulk_fixed = 1.0 / np.sqrt(v @ F @ v)
+    bulk_marg = float(np.sqrt(v @ cov @ v))
+    print(f"\nbulk core ({core_zone_names}, same physical region as the old "
+          f"single ln rho_core):")
+    print(f"  fixed nuisances : {bulk_fixed:.4f}")
+    print(f"  marginalized    : {bulk_marg:.4f}")
+
+    if N_DENS > 1:
+        d = np.sqrt(np.diag(cov[:N_DENS, :N_DENS]))
+        corr = cov[:N_DENS, :N_DENS] / np.outer(d, d)
+        print("\ncorrelation matrix among density-zone parameters:")
+        short = [l.replace("ln rho_", "") for l in LABELS[:N_DENS]]
+        hdr = "".join(f"{s:>16s}" for s in short)
+        print("                " + hdr)
+        for i in range(N_DENS):
+            row = "".join(f"{corr[i,j]:>16.2f}" for j in range(N_DENS))
+            print(f"{short[i]:<16s}{row}")
+        if IS_MULTI_ZONE_CORE:
+            i0, i1 = CORE_ZONE_IDXS[0], CORE_ZONE_IDXS[1]
+            print(f"\n{short[i0]} / {short[i1]} correlation: {corr[i0,i1]:+.3f}")
+
+    # which nuisances actually cost the (coordinate) parameter LABELS[0]?
+    # (Schur complement over subsets -- only valid for coordinate directions,
+    # so this uses zone 0 directly rather than the bulk-core combination.)
     def marg(keep):
-        """sigma(par 0) marginalizing only over the indices in `keep`."""
         idx = [0] + sorted(keep)
         sub = F[np.ix_(idx, idx)]
         return np.sqrt(np.linalg.inv(sub)[0, 0])
 
-    print("\nwhere the marginalization cost comes from:")
-    print(f"  all other parameters fixed          : {1/np.sqrt(F[0,0]):.4f}")
-    print(f"  marginalize flux only (5,6)         : {marg([4, 5]):.4f}")
-    print(f"  marginalize theta23, dm31 only (3,4): {marg([2, 3]):.4f}")
-    print(f"  marginalize ln rho_mantle only      : {marg([1]):.4f}")
-    print(f"  marginalize everything              : {np.sqrt(cov[0,0]):.4f}")
+    print(f"\nwhere the marginalization cost on {LABELS[0]} comes from:")
+    print(f"  all other parameters fixed              : {1/np.sqrt(F[0,0]):.4f}")
+    if N_DENS > 1:
+        print(f"  marginalize {LABELS[1].replace('ln rho_',''):<16s} only     : "
+              f"{marg([1]):.4f}")
+    if N_DENS > 2:
+        print(f"  marginalize all other density zones     : "
+              f"{marg(list(range(1, N_DENS))):.4f}")
+    print(f"  marginalize theta23, dm31 only           : "
+          f"{marg([IDX_TH23, IDX_DM31]):.4f}")
+    print(f"  marginalize everything                   : {np.sqrt(cov[0,0]):.4f}")
 
-    # where does the core information actually come from?
-    Jn = np.asarray(J)
-    mun = np.asarray(mu)
-    per_bin = (Jn[:, 0] ** 2) / mun            # diagonal Fisher contribution
-    core_mask = np.asarray(CZ_C) < CORE_CZ
-    frac_info = per_bin[core_mask].sum() / per_bin.sum()
+    # --- condition number sanity check --------------------------------------
+    cond_F = np.linalg.cond(F)
+    resid = np.abs(F @ cov - np.eye(len(F))).max()
+    print(f"\ncondition number of F: {cond_F:.3e}")
+    print(f"  max |F @ F^-1 - I| = {resid:.2e} "
+          f"(float64 eps ~1e-16; this says the inverse above is trustworthy "
+          f"despite the large condition number)")
+
+    # --- where does the (bulk) core information actually come from? --------
+    Jv = Jn @ v                                # (n_bins_total,) dmu/d(bulk core)
+    per_bin_all = (Jv ** 2) / mun
+    cz_full = (np.asarray(CZ_C) if not INCLUDE_ANTINU
+              else np.concatenate([np.asarray(CZ_C), np.asarray(CZ_C)]))
+    core_mask = cz_full < CORE_CZ
+    frac_info = per_bin_all[core_mask].sum() / per_bin_all.sum()
     frac_bins = core_mask.mean()
     frac_evts = mun[core_mask].sum() / mun.sum()
-    print(f"\ncore-crossing bins (cos theta_z < {CORE_CZ:.4f}):")
+    print(f"\ncore-crossing bins (cos theta_z < {CORE_CZ:.4f}), bulk-core "
+          f"({core_zone_names}) direction:")
     print(f"  {frac_bins*100:.1f}% of bins, {frac_evts*100:.1f}% of events, "
-          f"but {frac_info*100:.1f}% of F_00")
-    print("  (F_00 is the NUISANCE-FIXED information on ln rho_core -- that is "
-          "the\n   quantity that decomposes additively over bins; the "
-          "marginalized\n   information does not split this way.)")
+          f"but {frac_info*100:.1f}% of the fixed-nuisance information")
+    print(f"  (this additive-over-bins decomposition holds for ANY linear "
+          f"combination of\n   coordinate parameters -- including the bulk-"
+          f"core direction -- so it still makes\n   sense with N_ZONES="
+          f"{N_ZONES}; it is the marginalized information that does not "
+          f"split this way.)")
 
-    print(f"\nstatistical scaling: sigma(ln rho_core) = "
-          f"{np.sqrt(cov[0,0])*np.sqrt(N_EVENTS/1e5):.4f} "
-          f"x sqrt(1e5 / N_events)")
+    print(f"\nstatistical scaling: sigma(bulk core) = "
+          f"{bulk_marg*np.sqrt(N_EVENTS/1e5):.4f} x sqrt(1e5 / N_events)")
 
     # --- the composability one-liner: d sigma / d (angular resolution) -------
     s0 = float(sigma_core(RES_CZ))
     dsdr = float(jax.grad(sigma_core)(RES_CZ))
     h = 1e-3
     fd = (float(sigma_core(RES_CZ + h)) - float(sigma_core(RES_CZ - h))) / (2 * h)
-    print(f"\nexperimental-design derivative (through the matrix inverse):")
-    print(f"  sigma(ln rho_core) at res_cz={RES_CZ}      : {s0:.5f}")
+    print(f"\nexperimental-design derivative (bulk core, through the matrix "
+          f"inverse):")
+    print(f"  sigma(bulk core) at res_cz={RES_CZ}        : {s0:.5f}")
     print(f"  d sigma / d res_cz  (autodiff)             : {dsdr:+.5f}")
     print(f"  d sigma / d res_cz  (central differences)  : {fd:+.5f}")
     print(f"  -> sharpening cos(theta) resolution by 0.01 reduces "
-          f"sigma(ln rho_core) by {dsdr*0.01/s0*100:.2f}%")
+          f"sigma(bulk core) by {dsdr*0.01/s0*100:.2f}%")
 
     np.savez("tomography_fisher.npz", F=F, cov=cov, mu=mun,
              theta0=np.asarray(THETA0), labels=np.array(LABELS),
-             frac_info=frac_info)
+             frac_info=frac_info, n_zones=N_ZONES,
+             include_antinu=INCLUDE_ANTINU)
     print("\nsaved tomography_fisher.npz")
 
-    _figure(Jn, mun, per_bin, frac_info, s0, dsdr, frac_bins * 100)
+    _figure(Jn, mun, per_bin_all, frac_info, s0, dsdr, frac_bins * 100, cov)
 
 
-def _figure(Jn, mun, per_bin, frac_info, s0, dsdr, frac_bins_pct):
-    """Three panels: the derivative after the full chain, where the information
-    lands, and what the design derivative buys."""
+def _figure(Jn, mun, per_bin_all, frac_info, s0, dsdr, frac_bins_pct, cov):
+    """Four panels: the derivative after the full chain, where the
+    information lands, what the design derivative buys, and (new) the
+    density-parameter correlation matrix -- the exhibit a 2-parameter density
+    model cannot produce."""
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
@@ -249,49 +450,54 @@ def _figure(Jn, mun, per_bin, frac_info, s0, dsdr, frac_bins_pct):
 
     E = np.asarray(E_C).reshape(N_E, N_CZ)
     CZ = np.asarray(CZ_C).reshape(N_E, N_CZ)
-    dmu = Jn[:, 0].reshape(N_E, N_CZ)
-    info = per_bin.reshape(N_E, N_CZ)
+    # nu-channel only for the spatial maps (a)/(b) -- the antinu channel
+    # enters the Fisher matrix identically and is not re-plotted here.
+    dmu = sum(Jn[:N_BINS, i] for i in CORE_ZONE_IDXS).reshape(N_E, N_CZ)
+    info = per_bin_all[:N_BINS].reshape(N_E, N_CZ)
 
-    # 2x2 rather than 1x3: at \textwidth a three-across strip leaves each panel
-    # about a third of the text width, which is too small to read the axes. A
-    # 2x2 grid (with the fourth cell left empty for the legend/notes) roughly
-    # doubles the linear size of each panel at the same figure width.
+    # 2x2: (a)(b)(c) as before, (d) is now the correlation-matrix exhibit.
     fig, axes = plt.subplots(2, 2, figsize=(11.0, 8.6))
-    ax = [axes[0, 0], axes[0, 1], axes[1, 0]]
-    axes[1, 1].axis("off")
+    ax = [axes[0, 0], axes[0, 1], axes[1, 0], axes[1, 1]]
 
-    # (a) dmu/dln rho_core in RECONSTRUCTED space -- i.e. after flux weighting
-    #     and after the response matrix, unlike Fig. 2 which is true space.
+    # (a) dmu/d(bulk core) in RECONSTRUCTED space (nu channel) -- i.e. after
+    #     flux weighting and after the response matrix.
     v = np.abs(dmu).max()
     m = ax[0].pcolormesh(CZ, E, dmu, cmap="RdBu_r", vmin=-v, vmax=v,
                          shading="auto")
     plt.colorbar(m, ax=ax[0], label=r"$\partial\mu_b/\partial\ln\rho_{\rm core}$")
-    ax[0].set_title(r"(a) count derivative, reconstructed space")
+    ax[0].set_title(r"(a) count derivative, reconstructed space", pad=14)
 
-    # (b) per-bin Fisher information on ln rho_core.  Log colour scale: the
-    #     dynamic range is several decades and a linear scale shows only the
-    #     single brightest cell, hiding the structure that makes the point.
+    # (b) per-bin Fisher information on the bulk-core direction (nu channel).
+    #     Log colour scale: the dynamic range is several decades and a linear
+    #     scale shows only the single brightest cell, hiding the structure
+    #     that makes the point.
     from matplotlib.colors import LogNorm
     pos = info[info > 0]
     m = ax[1].pcolormesh(CZ, E, np.maximum(info, pos.min()), cmap="viridis",
                          norm=LogNorm(vmin=max(pos.min(), pos.max() * 1e-5),
                                       vmax=pos.max()), shading="auto")
     plt.colorbar(m, ax=ax[1], label=r"per-bin contribution to $F_{00}$")
-    ax[1].set_title(r"(b) where the information is")
-    ax[1].annotate(f"{frac_info*100:.0f}% of $F_{{00}}$\n"
-                   f"left of the line\n({frac_bins_pct:.0f}% of the bins)",
+    ax[1].set_title(r"(b) where the information is", pad=14)
+    ax[1].annotate(f"{frac_info*100:.0f}% of info\nleft of the line\n"
+                   f"({frac_bins_pct:.0f}% of the bins)",
                    xy=(0.42, 0.88), xycoords="axes fraction", color="w",
                    fontsize=10, fontweight="bold", va="top")
 
     for a in ax[:2]:
         a.axvline(CORE_CZ, color="k", ls="--", lw=1.4)
         a.set_yscale("log")
-        a.set_ylim(E.min(), 20.0)
+        # ylim upper deliberately > the 2e1 major tick (not exactly on it): a
+        # tick that sits exactly on the axis boundary has its label straddle
+        # the top spine and collide with the title text above.
+        a.set_ylim(E.min(), 23.0)
         a.set_xlabel(r"$\cos\theta_z$ (reconstructed)")
         a.annotate("core-crossing", xy=(CORE_CZ, 19.0), xytext=(-4, 0),
                    textcoords="offset points", rotation=90, ha="right",
                    va="top", fontsize=8.5)
-    ax[0].set_ylabel("reconstructed energy [GeV]")
+    # short label: "reconstructed" is already established by the panel title
+    # and the x-axis; the full string was tall enough (rotated) to collide
+    # with the title above it.
+    ax[0].set_ylabel("energy [GeV]")
 
     # (c) the design derivative: AD tangent against an explicit scan
     mu_true, J_true = _true_space()
@@ -305,15 +511,51 @@ def _figure(Jn, mun, per_bin, frac_info, s0, dsdr, frac_bins_pct):
                      "\n(one gradient call)")
     ax[2].plot([RES_CZ], [s0], "r*", ms=13, zorder=5)
     ax[2].set_xlabel(r"angular resolution $\sigma_{\cos\theta_z}$")
-    ax[2].set_ylabel(r"$\sigma(\ln\rho_{\rm core})$, marginalized")
-    ax[2].set_title("(c) the experimental-design derivative")
-    _h, _l = ax[2].get_legend_handles_labels()
-    axes[1, 1].legend(_h, _l, loc="center left", frameon=False)
+    ax[2].set_ylabel(r"$\sigma(\ln\rho_{\rm core,\,bulk})$")
+    ax[2].set_title("(c) experimental-design derivative", pad=14)
+    ax[2].legend(loc="upper left", frameon=False, fontsize=11)
     ax[2].grid(alpha=0.3)
 
-    fig.tight_layout()
+    # (d) NEW: the density-parameter correlation matrix -- the exhibit a
+    #     2-parameter density model structurally cannot produce.  Diverging
+    #     colour scale centred at zero; annotated with the numeric values.
+    if N_DENS > 1:
+        d = np.sqrt(np.diag(cov[:N_DENS, :N_DENS]))
+        corr = cov[:N_DENS, :N_DENS] / np.outer(d, d)
+        short = [l.replace("ln rho_", "").replace("_", "\n")
+                for l in LABELS[:N_DENS]]
+        m = ax[3].imshow(corr, cmap="RdBu_r", vmin=-1, vmax=1)
+        ax[3].set_xticks(range(N_DENS))
+        ax[3].set_yticks(range(N_DENS))
+        ax[3].set_xticklabels(short, fontsize=10, rotation=45, ha="right")
+        ax[3].set_yticklabels(short, fontsize=10)
+        for i in range(N_DENS):
+            for j in range(N_DENS):
+                txt_color = "white" if abs(corr[i, j]) > 0.6 else "black"
+                ax[3].text(j, i, f"{corr[i,j]:+.2f}", ha="center", va="center",
+                          fontsize=9.5, color=txt_color)
+        # highlight the core-zone/core-zone off-diagonal cell(s): the
+        # degeneracy a 2-parameter model could not show (e.g. inner-core vs
+        # outer-core for N_ZONES=6; a no-op for N_ZONES=2, only one core zone).
+        if IS_MULTI_ZONE_CORE:
+            from matplotlib.patches import Rectangle
+            i0, i1 = CORE_ZONE_IDXS[0], CORE_ZONE_IDXS[1]
+            ax[3].add_patch(Rectangle((i1 - 0.5, i0 - 0.5), 1, 1, fill=False,
+                                      edgecolor="lime", lw=2.5))
+            ax[3].add_patch(Rectangle((i0 - 0.5, i1 - 0.5), 1, 1, fill=False,
+                                      edgecolor="lime", lw=2.5))
+        plt.colorbar(m, ax=ax[3], label="correlation coefficient", shrink=0.85)
+        ax[3].set_title("(d) density-zone correlations", pad=14)
+    else:
+        ax[3].axis("off")
+        ax[3].annotate("correlation matrix needs N_ZONES>1\n"
+                       "(run with the default N_ZONES=6)",
+                       xy=(0.5, 0.5), xycoords="axes fraction", ha="center")
+
+    fig.tight_layout(w_pad=2.6, h_pad=2.2)
     for ext in ("png", "pdf"):
-        fig.savefig(f"tomography_fisher.{ext}", dpi=150, bbox_inches="tight")
+        fig.savefig(f"tomography_fisher.{ext}", dpi=150, bbox_inches="tight",
+                   pad_inches=0.08)
     print("saved tomography_fisher.png/.pdf")
 
     # the scan and the AD tangent are independent routes to the same slope
