@@ -280,6 +280,12 @@ def _true_space():
             jnp.concatenate([J_true_nu, J_true_bar]))
 
 
+def _bulk_norm(v):
+    """Number of zones in the bulk direction; see the note in main() -- the
+    common-mode estimator is the average, so sigma carries a 1/n."""
+    return jnp.sum(v * v)
+
+
 def sigma_from_response(res_cz, mu_true, J_true, v=BULK_CORE_VEC, res_lne=RES_LNE):
     """sigma(v . theta) for a given angular resolution, reusing the true-space
     Jacobian.  Must agree with sigma_core() below, which recomputes everything."""
@@ -287,7 +293,7 @@ def sigma_from_response(res_cz, mu_true, J_true, v=BULK_CORE_VEC, res_lne=RES_LN
     mu = _apply_response_block(R, mu_true)
     J = _apply_response_block(R, J_true)
     F = J.T @ (J / mu[:, None])
-    return float(jnp.sqrt(v @ jnp.linalg.inv(F) @ v))
+    return float(jnp.sqrt(v @ jnp.linalg.inv(F) @ v) / _bulk_norm(v))
 
 
 def sigma_core(res_cz, res_lne=RES_LNE, v=BULK_CORE_VEC):
@@ -302,7 +308,7 @@ def sigma_core(res_cz, res_lne=RES_LNE, v=BULK_CORE_VEC):
     mu = counts(THETA0, res_lne, res_cz)
     J = jax.jacfwd(counts)(THETA0, res_lne, res_cz)
     F = J.T @ (J / mu[:, None])
-    return jnp.sqrt(v @ jnp.linalg.inv(F) @ v)
+    return jnp.sqrt(v @ jnp.linalg.inv(F) @ v) / _bulk_norm(v)
 
 
 def main():
@@ -336,8 +342,17 @@ def main():
     # N_ZONES=2; zones 0+1 = inner+outer core for N_ZONES=6) ----------------
     v = np.asarray(BULK_CORE_VEC)
     core_zone_names = " + ".join(LABELS[i] for i in CORE_ZONE_IDXS)
+    # Both numbers must describe the SAME quantity. Take it to be q, the
+    # common-mode scaling: theta = theta0 + q*v, i.e. every core zone shifts by
+    # the same q. Then the reduced-model (all-else-fixed) uncertainty is
+    # 1/sqrt(v^T F v), and the marginalized one is sqrt(v^T C v)/n, where
+    # n = v.v is the number of zones summed -- the estimator of a common shift
+    # is the AVERAGE of the per-zone shifts, not their sum. Omitting that 1/n
+    # compares sigma(a1+a2) against sigma(q) and overstates the degradation by
+    # exactly n.
+    n_core = float(v @ v)
     bulk_fixed = 1.0 / np.sqrt(v @ F @ v)
-    bulk_marg = float(np.sqrt(v @ cov @ v))
+    bulk_marg = float(np.sqrt(v @ cov @ v)) / n_core
     print(f"\nbulk core ({core_zone_names}, same physical region as the old "
           f"single ln rho_core):")
     print(f"  fixed nuisances : {bulk_fixed:.4f}")
