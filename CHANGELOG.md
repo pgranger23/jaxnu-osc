@@ -5,6 +5,26 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.2.2] - 2026-07-30
+
+### Fixed
+
+- **`demo_tomography_fisher.py` bulk-core normalization.** The summary compared
+  sigma of the common-mode core scaling against sigma of the *sum* of the two
+  core zones -- quantities differing by a factor of two -- overstating the
+  marginalization penalty. Corrected: 0.302 -> 0.151, and the design derivative
+  2.371 -> 1.186. Per-zone numbers were unaffected.
+- **`globes.py` silent zero baseline** for `$baseline` (only `$baselinelength`
+  was recognised), which zeroed every appearance channel without error.
+- Documented the `eigh` backend's degenerate-spectrum gradient hazard.
+
+### Added
+
+- Spectral-tilt systematics in the GLoBES loader (manual Eq. 11.26).
+- Layered/Earth non-unitary propagation (previously single-layer only).
+- `bench_derivative_classes.py`, `bench_bsm_comparison.py`, and a
+  six-zone + antineutrino tomography demo.
+
 ## [0.2.1] - 2026-07-28
 
 Review-round correctness fixes, applied on top of the v0.2.0 feature

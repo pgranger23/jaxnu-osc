@@ -30,6 +30,8 @@ Drop `JAX_PLATFORMS=cpu` to let JAX pick up a visible GPU/TPU.
 | `bench_backends_and_precision.py timing` | forward-evaluation throughput of the four propagation backends (`cayley`, `eigh`, `expm`, `nufast`) at constant density, plus the PREM Earth forward pass and its full 6-parameter gradient, run standalone (independent of the plotting script below) | Table "Backend performance per energy point" (the CPU column; run again on a GPU host for the A100 column) |
 | `bench_backends_and_precision.py grad` | autodiff vs. central finite differences for all three derivative classes claimed in the paper: oscillation parameters (θ13, θ23, δCP, Δm²31), geometry (cos θ_z, atmospheric production height), and matter density (core/mantle log-density scale factors) | the "10⁻⁸ level or better" gradient-validation claim (Validation section) |
 | `bench_backends_and_precision.py prec` | float32 vs float64 agreement for a PREM oscillogram, quantifying why float64 is mandatory | the "double precision is mandatory" claim (Units and precision, `README.md`) |
+| `bench_derivative_classes.py` | reverse-mode gradient cost for each derivative class through the layered PREM Earth -- oscillation parameters (6), geometry (42) and the full parameter set of a 123-shell LayeredEarth (369) -- with mean and standard deviation over independent groups, and a finite-difference check of every class | Table "Cost of a reverse-mode gradient relative to one forward evaluation" |
+| `bench_bsm_comparison.py` | the adiabatic solar sector against an independently written closed-form two-flavour MSW formula (the one beyond-standard-model sector for which a non-circular check is possible without a third-party code) | the solar cross-check quoted in the beyond-standard-model section |
 | `bench_timing_and_gradients.py` | (a) the same backend timing rows as above but self-contained in one script including the NuFast port, and (b) `∂P/∂ln ρ` oscillograms for the core and mantle density — the matter-density tomography derivative that no analytic constant-density code (NuFast, Prob3++, ...) can supply | Table "Backend performance per energy point" (self-contained cross-check) and the density-derivative figure discussed in the Introduction/BSM sections |
 
 `check_bsm_limits.py` takes about 35 s on CPU, almost all of it JIT warm-up rather than arithmetic; `demo_tomography_fisher.py` takes a couple of minutes on CPU (900 bins x 6 parameters through the layered Earth). The other two scripts do
@@ -52,10 +54,12 @@ compilation, which dominates for the smaller scripts:
 
 | script (mode) | wall time | ran clean? |
 |---|---|---|
-| `check_bsm_limits.py` | ~2 s | yes |
+| `check_bsm_limits.py` | ~35-70 s (almost all JIT warm-up) | yes |
 | `bench_backends_and_precision.py timing` | ~2-3 min (most of it is `jit`-compiling the 6-parameter PREM gradient once) | yes |
 | `bench_backends_and_precision.py grad` | ~1-2 min | yes |
 | `bench_backends_and_precision.py prec` | ~15-20 s | yes |
+| `bench_derivative_classes.py` | ~7 min CPU / ~1.5 min GPU | yes |
+| `bench_bsm_comparison.py` | ~1 min | yes |
 | `bench_timing_and_gradients.py` | ~5-10 min (the `∂P/∂ln ρ` oscillogram is a 110×110 grid of PREM-Earth Jacobians, `NG=110`, on CPU) | yes, but slow — see note below |
 
 None of these needed batch-size changes to finish in a reasonable time on
