@@ -22,7 +22,18 @@ from .eigensolve import eigvalsh3
 
 
 def propagator_eigh(h, length):
-    """``exp(-i H L)`` via Hermitian eigendecomposition (any N)."""
+    """``exp(-i H L)`` via Hermitian eigendecomposition (any N).
+
+    .. warning::
+       This is the general-``N`` reference path, not the fast one, and its
+       **gradient** is unsafe at degeneracy: JAX's VJP for ``eigh`` contains
+       eigenvector-derivative terms in ``1/(lambda_i - lambda_j)``, which blow
+       up when two eigenvalues coincide. The default ``cayley`` backend needs no
+       eigenvectors and is accurate at exact degeneracy, so prefer it whenever
+       derivatives are taken. Nothing here can detect the problem at run time --
+       the divergence appears as a large or non-finite gradient, not as an
+       error -- so this note is the only guard.
+    """
     w, v = jnp.linalg.eigh(h)
     phase = jnp.exp(-1j * w * length)
     return (v * phase) @ jnp.conj(v).T
