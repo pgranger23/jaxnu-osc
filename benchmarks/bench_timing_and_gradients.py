@@ -106,15 +106,31 @@ out["dev"] = np.array([dev])
 table = _osc._earth.shell_table(4)
 
 
-def prob_scaled(sc_core, sc_mantle, e_eV, czi, anti=False):
-    rho, ye, L = _osc._earth.chord_segments(czi, table, h_atm_km=15.0, det_depth_km=0.0)
+def prob_all(sc_core, sc_mantle, czi, h_atm, th23, e_eV, anti=False):
+    """P(nu_mu -> nu_mu), differentiable in one representative input from each
+    of the three derivative classes the paper distinguishes:
+
+      matter     -- sc_core, sc_mantle  (multiplicative shell-density scalings)
+      geometry   -- czi, h_atm          (zenith angle, production height)
+      parameters -- th23                (a standard oscillation parameter)
+
+    Written as a single function so one jacfwd produces all five derivative
+    maps on the same grid, which is what the figure shows.
+    """
+    rho, ye, L = _osc._earth.chord_segments(czi, table, h_atm_km=h_atm,
+                                            det_depth_km=0.0)
     core = rho > 9.0                       # PREM: outer core >= 9.9, mantle <= 5.6 g/cm^3
     rho_s = rho * jnp.where(core, sc_core, sc_mantle)
     v_cc, _ = _osc.C.matter_potentials(rho_s, ye)
-    u, msq = P.pmns(), P.msquared()
-    s = _osc.propagate_layers(u, msq, e_eV, v_cc, L * _osc.C.KM_TO_INV_EV,
-                              anti=anti, backend="cayley")
+    p_th = dataclasses.replace(P, theta23=th23)
+    s = _osc.propagate_layers(p_th.pmns(), p_th.msquared(), e_eV, v_cc,
+                              L * _osc.C.KM_TO_INV_EV, anti=anti, backend="cayley")
     return _osc.prob_from_amplitude(s)
+
+
+def prob_scaled(sc_core, sc_mantle, e_eV, czi, anti=False):
+    """Back-compatible wrapper: density scalings only, nominal geometry."""
+    return prob_all(sc_core, sc_mantle, czi, 15.0, P.theta23, e_eV, anti=anti)
 
 
 # NG=110 (12100 jax.jacfwd PREM-Earth evaluations) is what the paper figure
@@ -122,21 +138,28 @@ def prob_scaled(sc_core, sc_mantle, e_eV, czi, anti=False):
 # (core/mantle sign pattern, MSW resonance) but runs in a fraction of the
 # time on a busy/shared CPU node. Raise NG back to 110 for a publication-
 # quality, smoothly-sampled figure.
-NG = 35
+NG = 90
 Eg = np.logspace(np.log10(1.0), np.log10(30.0), NG)
 czg = np.linspace(-1.0, -0.05, NG)
 Em, Cm = np.meshgrid(Eg, czg, indexing="ij")
 one = jnp.array(1.0)
 
 
+_H0 = jnp.asarray(15.0)          # nominal production height [km]
+_T23 = jnp.asarray(float(P.theta23))
+
+
 def cell(e, c):
-    d = jax.jacfwd(lambda a, b: prob_scaled(a, b, e * _osc.C.GEV_TO_EV, c)[1, 1],
-                   argnums=(0, 1))(one, one)
+    """All five derivatives at one grid point, from a single jacfwd."""
+    d = jax.jacfwd(
+        lambda a, b, cz, h, t: prob_all(a, b, cz, h, t,
+                                        e * _osc.C.GEV_TO_EV)[1, 1],
+        argnums=(0, 1, 2, 3, 4))(one, one, c, _H0, _T23)
     return jnp.stack(d)
 
 
 G = jax.vmap(cell)(jnp.asarray(Em.ravel()), jnp.asarray(Cm.ravel()))
-G = np.asarray(G).reshape(NG, NG, 2)
+G = np.asarray(G).reshape(NG, NG, 5)
 Pmm = np.asarray(jax.vmap(lambda e, c: prob_scaled(one, one, e * _osc.C.GEV_TO_EV, c)[1, 1])(
     jnp.asarray(Em.ravel()), jnp.asarray(Cm.ravel()))).reshape(NG, NG)
 out["Eg"] = Eg
@@ -145,24 +168,38 @@ out["G"] = G
 out["Pmm"] = Pmm
 np.savez(os.path.join(OUTDIR, "jaxnu_bench_timing_and_gradients.npz"), **out)
 
-fig, axes = plt.subplots(1, 3, figsize=(16.5, 4.8), sharey=True)
-im = axes[0].pcolormesh(czg, Eg, Pmm, cmap="viridis", shading="auto", vmin=0, vmax=1)
-axes[0].set_title(r"$P(\nu_\mu\to\nu_\mu)$")
-plt.colorbar(im, ax=axes[0])
-for k, (lab, ttl) in enumerate([("core", r"$\partial P/\partial\ln\rho_{\rm core}$"),
-                                ("mantle", r"$\partial P/\partial\ln\rho_{\rm mantle}$")]):
+plt.rcParams.update({"font.size": 15, "axes.titlesize": 16,
+                     "axes.labelsize": 15, "xtick.labelsize": 13,
+                     "ytick.labelsize": 13})
+fig, axes = plt.subplots(2, 3, figsize=(16.5, 9.4), sharey=True, sharex=True)
+im = axes[0, 0].pcolormesh(czg, Eg, Pmm, cmap="viridis", shading="auto",
+                           vmin=0, vmax=1)
+axes[0, 0].set_title(r"$P(\nu_\mu\to\nu_\mu)$")
+plt.colorbar(im, ax=axes[0, 0])
+
+# one representative derivative from each class; index into G matches the
+# argnums order of `cell` above.
+panels = [
+    (0, axes[0, 1], r"matter:  $\partial P/\partial\ln\rho_{\rm core}$"),
+    (1, axes[0, 2], r"matter:  $\partial P/\partial\ln\rho_{\rm mantle}$"),
+    (2, axes[1, 0], r"geometry:  $\partial P/\partial\cos\theta_z$"),
+    (3, axes[1, 1], r"geometry:  $\partial P/\partial h_{\rm atm}$  [km$^{-1}$]"),
+    (4, axes[1, 2], r"parameter:  $\partial P/\partial\theta_{23}$"),
+]
+for k, ax, ttl in panels:
     v = np.abs(G[:, :, k]).max()
-    im = axes[k + 1].pcolormesh(czg, Eg, G[:, :, k], cmap="RdBu_r", shading="auto",
-                                vmin=-v, vmax=v)
-    axes[k + 1].set_title(ttl)
-    plt.colorbar(im, ax=axes[k + 1])
-for ax in axes:
+    im = ax.pcolormesh(czg, Eg, G[:, :, k], cmap="RdBu_r", shading="auto",
+                       vmin=-v, vmax=v)
+    ax.set_title(ttl)
+    plt.colorbar(im, ax=ax)
+for ax in axes.ravel():
     ax.set_yscale("log")
+for ax in axes[1, :]:
     ax.set_xlabel(r"$\cos\theta_z$")
-axes[0].set_ylabel("neutrino energy [GeV]")
-fig.suptitle("jaxnu: exact autodiff derivatives with respect to PREM shell densities "
-             "(core/mantle), through the layered Earth", fontsize=12)
+for ax in axes[:, 0]:
+    ax.set_ylabel("neutrino energy [GeV]")
 fig.tight_layout()
 figpath = os.path.join(OUTDIR, "jaxnu_rho_grad.png")
 fig.savefig(figpath, dpi=140, bbox_inches="tight")
+fig.savefig(figpath.replace(".png", ".pdf"), bbox_inches="tight")
 print(f"saved {figpath}")
