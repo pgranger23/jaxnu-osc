@@ -168,10 +168,13 @@ out["G"] = G
 out["Pmm"] = Pmm
 np.savez(os.path.join(OUTDIR, "jaxnu_bench_timing_and_gradients.npz"), **out)
 
-plt.rcParams.update({"font.size": 15, "axes.titlesize": 16,
-                     "axes.labelsize": 15, "xtick.labelsize": 13,
-                     "ytick.labelsize": 13})
-fig, axes = plt.subplots(2, 3, figsize=(16.5, 9.4), sharey=True, sharex=True)
+# Placed at \textwidth (~6.3 in). A 16.5 in canvas is scaled by 0.38, which
+# put the previous 15 pt text at under 6 pt on paper. Narrow the canvas to 13 in
+# (scale ~0.48) and raise the fonts so labels land near 10 pt printed.
+plt.rcParams.update({"font.size": 20, "axes.titlesize": 21,
+                     "axes.labelsize": 20, "xtick.labelsize": 17,
+                     "ytick.labelsize": 17})
+fig, axes = plt.subplots(2, 3, figsize=(13.0, 8.2), sharey=True, sharex=True)
 im = axes[0, 0].pcolormesh(czg, Eg, Pmm, cmap="viridis", shading="auto",
                            vmin=0, vmax=1)
 axes[0, 0].set_title(r"$P(\nu_\mu\to\nu_\mu)$")

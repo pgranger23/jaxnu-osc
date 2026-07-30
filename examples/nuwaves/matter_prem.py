@@ -37,6 +37,12 @@ panels = [
     (Pbar[..., Flavor.MU, Flavor.MU], r"$P_{\bar\nu_\mu \to \bar\nu_\mu}$", "white"),
 ]
 
+# The figure is placed at \textwidth (~6.3 in), so a 9.8 in canvas is scaled
+# by ~0.64. Default 10 pt text would print at ~6 pt; scale up so axis and
+# tick labels land near 10 pt on paper.
+plt.rcParams.update({"font.size": 15, "axes.titlesize": 16,
+                     "axes.labelsize": 15, "xtick.labelsize": 13,
+                     "ytick.labelsize": 13})
 fig, axs = plt.subplots(2, 2, figsize=(9.8, 8.0), dpi=140, constrained_layout=True)
 for ax, (Z, lab, col) in zip(axs.flat, panels):
     pc = ax.pcolormesh(E, cz, Z, vmin=0, vmax=1, shading="auto", cmap="inferno_r")
@@ -50,7 +56,7 @@ for ax in axs[:, 0]:
     ax.set_ylabel(r"$\cos\theta_z$")
 cbar = fig.colorbar(axs.flat[0].collections[0], ax=axs, location="right",
                     fraction=0.05, pad=0.03)
-cbar.set_label("Oscillation probability", fontsize=12)
+cbar.set_label("Oscillation probability", fontsize=15)
 plt.savefig(FIGDIR / "matter_prem_test.jpg", dpi=140)
 # also emit a lossless high-resolution copy: the JPEG is fine on screen but
 # its compression puts ringing artefacts into the fine near-horizon fringes,
