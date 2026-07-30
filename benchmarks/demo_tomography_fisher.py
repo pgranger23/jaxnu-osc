@@ -252,7 +252,13 @@ def _figure(Jn, mun, per_bin, frac_info, s0, dsdr, frac_bins_pct):
     dmu = Jn[:, 0].reshape(N_E, N_CZ)
     info = per_bin.reshape(N_E, N_CZ)
 
-    fig, ax = plt.subplots(1, 3, figsize=(16.5, 4.6))
+    # 2x2 rather than 1x3: at \textwidth a three-across strip leaves each panel
+    # about a third of the text width, which is too small to read the axes. A
+    # 2x2 grid (with the fourth cell left empty for the legend/notes) roughly
+    # doubles the linear size of each panel at the same figure width.
+    fig, axes = plt.subplots(2, 2, figsize=(11.0, 8.6))
+    ax = [axes[0, 0], axes[0, 1], axes[1, 0]]
+    axes[1, 1].axis("off")
 
     # (a) dmu/dln rho_core in RECONSTRUCTED space -- i.e. after flux weighting
     #     and after the response matrix, unlike Fig. 2 which is true space.
@@ -301,7 +307,8 @@ def _figure(Jn, mun, per_bin, frac_info, s0, dsdr, frac_bins_pct):
     ax[2].set_xlabel(r"angular resolution $\sigma_{\cos\theta_z}$")
     ax[2].set_ylabel(r"$\sigma(\ln\rho_{\rm core})$, marginalized")
     ax[2].set_title("(c) the experimental-design derivative")
-    ax[2].legend(fontsize=8.5, loc="upper left")
+    _h, _l = ax[2].get_legend_handles_labels()
+    axes[1, 1].legend(_h, _l, loc="center left", frameon=False)
     ax[2].grid(alpha=0.3)
 
     fig.tight_layout()

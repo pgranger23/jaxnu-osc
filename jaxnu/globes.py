@@ -26,8 +26,8 @@ similar modern configs):
 * ``channel`` with ``NOSC_`` flavors and pre/post smearing efficiencies and
   backgrounds; ``rule`` with ``coef@#channel`` lists, ``@energy_window``, and
   normalization systematics via ``@sys_on_multiex_errors_*`` sys lists or
-  ``@signalerror/@backgrounderror`` (first component; tilts are ignored with a
-  warning).
+  ``@signalerror/@backgrounderror`` (both components: normalization and
+  spectral tilt, the latter following GLoBES manual Eq. 11.26)
 
 **Normalization.** Rates use the physical convention
 ``POT(@time * @power * pot_unit) x nucleons($target_mass) x flux x sigma``, times
@@ -229,6 +229,7 @@ class GlobesExperiment:
 
         # systematics
         self.sys_sigma = {}
+        self.sys_sigma_tilt = {}
         for name, bodies in _blocks(text, "sys").items():
             self.sys_sigma[name] = defs.num(_attr(bodies[-1], "error"))
 
@@ -283,9 +284,9 @@ class GlobesExperiment:
                     nums = re.findall(r"[0-9.eE+\-]+", v)
                     lab = f"{name}_{label}"
                     self.sys_sigma[lab] = float(nums[0])
-                    if len(nums) > 1 and float(nums[1]) > 0:
-                        warnings.warn(f"rule {name}: spectral tilt error ignored "
-                                      "(normalization systematics only)")
+                    # second component is the spectral-tilt (energy-calibration)
+                    # error, in GLoBES' "@signalerror = norm : tilt" ordering.
+                    self.sys_sigma_tilt[lab] = float(nums[1]) if len(nums) > 1 else 0.0
                     return [lab] * len(chans)
                 return [None] * len(chans)
 
@@ -303,6 +304,17 @@ class GlobesExperiment:
                                   for s in r.sys_sig + r.sys_bkg if s})
         self.sys_index = {k: i for i, k in enumerate(self.sys_labels)}
         self.sigma_vec = jnp.asarray([self.sys_sigma[k] for k in self.sys_labels])
+        self.sigma_tilt_vec = jnp.asarray(
+            [self.sys_sigma_tilt.get(k, 0.0) for k in self.sys_labels])
+        # GLoBES manual v3.0.8 Eq. (11.26): the tilt term rescales bin i by
+        #   b * (E_i - Ebar) / (Emax - Emin),
+        # with Ebar the midpoint of the DECLARED energy range ($emin, $emax) and
+        # the full width in the denominator. Note this pivot is the algebraic
+        # midpoint, not the rate-weighted mean, so a tilt is not in general
+        # rate-preserving -- only for a spectrum symmetric about Ebar.
+        _elo, _ehi = float(self.reco_edges[0]), float(self.reco_edges[-1])
+        self.tilt_basis = jnp.asarray(
+            (self.reco_c - 0.5 * (_elo + _ehi)) / (_ehi - _elo))
 
     # --- smearing ----------------------------------------------------------
     def smear_matrix(self, name):
@@ -405,19 +417,44 @@ class GlobesExperiment:
         return {r: sum(a for (_s, _i, a) in comp)
                 for r, comp in self.components(params, **osc_kw).items()}
 
-    def chi2(self, params, xi, data, **osc_kw):
-        """Poisson chi2 with normalization systematics ``xi`` (len sys_labels).
+    def chi2(self, params, xi, data, xi_tilt=None, **osc_kw):
+        """Poisson chi2 with normalization and spectral-tilt systematics.
 
-        ``data``: dict rule -> observed spectrum on the fine bins. Add your own
-        oscillation-parameter priors externally. Differentiable in ``params``
-        and ``xi``.
+        ``xi``      : normalization nuisances, one per entry of ``sys_labels``.
+        ``xi_tilt`` : spectral-tilt nuisances, same length. ``None`` (default)
+                      disables the tilt entirely, reproducing the
+                      normalization-only behaviour.
+        ``data``    : dict rule -> observed spectrum on the fine bins.
+
+        Following the GLoBES convention, signal and background carry
+        independent nuisances (they already have distinct entries in
+        ``sys_labels``), the tilt rescales bin ``i`` by
+        ``b (E_i - Ebar)/(Emax - Emin)``, and each nuisance contributes a
+        Gaussian pull ``(x/sigma)^2``. Rules whose ``@signalerror`` gave no tilt
+        error have ``sigma_tilt = 0``; their tilt nuisance is frozen at zero and
+        contributes no pull. Add oscillation-parameter priors externally.
+        Differentiable in ``params``, ``xi`` and ``xi_tilt``.
         """
         comps = self.components(params, **osc_kw)
         chi = jnp.sum((xi / self.sigma_vec) ** 2)
+        has_tilt = self.sigma_tilt_vec > 0
+        if xi_tilt is None:
+            tilt = jnp.zeros_like(self.sigma_tilt_vec)
+        else:
+            # freeze the nuisance wherever no tilt error was declared, so an
+            # unconstrained parameter cannot leak into the fit
+            tilt = jnp.where(has_tilt, xi_tilt, 0.0)
+            chi = chi + jnp.sum(jnp.where(
+                has_tilt, (tilt / jnp.where(has_tilt, self.sigma_tilt_vec, 1.0)) ** 2,
+                0.0))
         for r, comp in comps.items():
             model = jnp.zeros(self.nreco)
             for (sys, _is_sig, arr) in comp:
-                f = 1.0 + (xi[self.sys_index[sys]] if sys else 0.0)
+                if sys:
+                    j = self.sys_index[sys]
+                    f = 1.0 + xi[j] + tilt[j] * self.tilt_basis
+                else:
+                    f = 1.0
                 model = model + f * arr
             w = self.windows[r]
             m = jnp.clip(model[w], 1e-9, None)
