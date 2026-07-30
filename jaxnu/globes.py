@@ -190,7 +190,20 @@ class GlobesExperiment:
             self.density = _floatlist(svar("densitytab"))
             self.lengths = _floatlist(svar("lengthtab"))
         else:  # profiletype 1: PREM chord for the given baseline
-            L = defs.num(svar("baselinelength", svar("lengthtab", "0").strip("{}")))
+            # AEDL spells this `$baseline` in every file we have seen; older
+            # documentation also uses `$baselinelength`. Accept both. Getting
+            # this wrong used to fail SILENTLY -- the baseline came out 0, so
+            # appearance channels evaluated to exactly zero (correct for L = 0,
+            # badly wrong for the experiment) with no error raised.
+            _bl = svar("baseline", svar("baselinelength",
+                                        svar("lengthtab", "").strip("{}")))
+            if not _bl or defs.num(_bl) <= 0:
+                raise ValueError(
+                    "profiletype=1 requires a positive baseline: none of "
+                    "$baseline, $baselinelength or $lengthtab gave one. "
+                    "Refusing to continue with a zero baseline, which would "
+                    "silently zero every appearance channel.")
+            L = defs.num(_bl)
             cz = -L / (2.0 * _earth.R_EARTH_KM)
             rho, ye_seg, seg = _earth.chord_segments(cz, _earth.shell_table(2))
             keep = np.asarray(seg) > 1e-6
