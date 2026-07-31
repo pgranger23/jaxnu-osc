@@ -5,6 +5,7 @@ P(nu_mu->nu_e), P(nu_mu->nu_mu) and the antineutrino versions over
 15 km atmospheric production height (so down-going directions oscillate too).
 """
 
+import os
 import time
 
 import matplotlib
@@ -14,9 +15,23 @@ import numpy as np
 import jax
 
 from _common import nuwaves_params, FIGDIR
-from jaxnu import probability_earth, Flavor
+from jaxnu import probability_earth, Flavor, nufit_no
 
-p = nuwaves_params("NO")
+# Two parameter sets, two purposes:
+#   PARAMS=nuwaves (default) -- the nu-waves example values, so that the
+#     comparison against their published reference plots is like for like.
+#     This is the validation artefact.
+#   PARAMS=nufit -- the NuFIT 5.1 point used everywhere else in the
+#     accompanying paper, so the paper's figures are internally consistent.
+# The two differ by well under a percent and the oscillogram structure is
+# indistinguishable by eye; the switch exists so neither purpose has to be
+# compromised for the other.
+_WHICH = os.environ.get("PARAMS", "nuwaves").lower()
+if _WHICH == "nufit":
+    p, _suffix = nufit_no(), "_nufit"
+else:
+    p, _suffix = nuwaves_params('NO'), ''
+print(f"parameter set: {_WHICH}")
 nE, nCZ = 300, 300
 E = np.geomspace(0.1, 100.0, nE)
 cz = np.linspace(-1.0, 1.0, nCZ)
@@ -57,11 +72,11 @@ for ax in axs[:, 0]:
 cbar = fig.colorbar(axs.flat[0].collections[0], ax=axs, location="right",
                     fraction=0.05, pad=0.03)
 cbar.set_label("Oscillation probability", fontsize=15)
-plt.savefig(FIGDIR / "matter_prem_test.jpg", dpi=140)
+plt.savefig(FIGDIR / f"matter_prem_test{_suffix}.jpg", dpi=140)
 # also emit a lossless high-resolution copy: the JPEG is fine on screen but
 # its compression puts ringing artefacts into the fine near-horizon fringes,
 # which is exactly the structure the figure exists to show.  (A vector PDF is
 # possible too but pcolormesh emits one path per cell, giving a multi-MB file
 # that older pdfTeX cannot embed; 400 dpi lossless is the practical choice.)
-plt.savefig(FIGDIR / "matter_prem_test.png", dpi=400)
-print("saved", FIGDIR / "matter_prem_test.jpg")
+plt.savefig(FIGDIR / f"matter_prem_test{_suffix}.png", dpi=400)
+print("saved", FIGDIR / f"matter_prem_test{_suffix}.png")
