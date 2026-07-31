@@ -19,9 +19,10 @@ is an experimental-design derivative with no analytic counterpart at all.
 
 This is a DEMONSTRATION OF THE MACHINERY, not a sensitivity forecast.  The
 "detector" is a placeholder: unit efficiency, Gaussian energy/angle smearing
-with no tails, no atmospheric-flux shape uncertainty beyond the nuisances
-below, no backgrounds.  Absolute numbers should be read only as scaling with
-the stated event count.
+with no tails, perfect nu/nubar separation (the response never mixes the two
+species), no atmospheric-flux shape uncertainty beyond the nuisances below,
+no backgrounds.  Absolute numbers should be read only as scaling with the
+stated event count.
 
 Earth model (default): the density is parametrized by N_ZONES=6 independent
 radial scale factors -- inner core, outer core, lower mantle, transition
@@ -48,6 +49,9 @@ Both realism changes are controlled by environment variables so the original
 reproduces the original 2-parameter result to the last stated digit.
 
 Run:  python demo_tomography_fisher.py   (defaults: N_ZONES=6, antinu on)
+
+Artefacts go to ``benchmarks/output/`` regardless of the working directory,
+alongside the other benchmark outputs.
 """
 
 import os
@@ -66,6 +70,15 @@ N_ZONES = int(os.environ.get("N_ZONES", "6"))
 INCLUDE_ANTINU = bool(int(os.environ.get("INCLUDE_ANTINU", "1")))
 
 # --- toy exposure ------------------------------------------------------------
+_OUTDIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "output")
+os.makedirs(_OUTDIR, exist_ok=True)
+
+
+def _out(name):
+    """Artefact path, alongside the other benchmark outputs."""
+    return os.path.join(_OUTDIR, name)
+
+
 N_EVENTS = 1.0e5          # nu_mu events in the sample (nubar sits on top of this)
 NUBAR_FRAC = 0.5          # toy nubar/nu event-count ratio (order-of-magnitude
                            # atmospheric nu_mu:nubar_mu correct; not a fit target)
@@ -435,11 +448,11 @@ def main():
     print(f"  -> sharpening cos(theta) resolution by 0.01 reduces "
           f"sigma(bulk core) by {dsdr*0.01/s0*100:.2f}%")
 
-    np.savez("tomography_fisher.npz", F=F, cov=cov, mu=mun,
+    np.savez(_out("tomography_fisher.npz"), F=F, cov=cov, mu=mun,
              theta0=np.asarray(THETA0), labels=np.array(LABELS),
              frac_info=frac_info, n_zones=N_ZONES,
              include_antinu=INCLUDE_ANTINU)
-    print("\nsaved tomography_fisher.npz")
+    print(f"\nsaved {_out('tomography_fisher.npz')}")
 
     _figure(Jn, mun, per_bin_all, frac_info, s0, dsdr, frac_bins * 100, cov)
 
@@ -569,9 +582,9 @@ def _figure(Jn, mun, per_bin_all, frac_info, s0, dsdr, frac_bins_pct, cov):
 
     fig.tight_layout(w_pad=2.6, h_pad=2.2)
     for ext in ("png", "pdf"):
-        fig.savefig(f"tomography_fisher.{ext}", dpi=150, bbox_inches="tight",
+        fig.savefig(_out(f"tomography_fisher.{ext}"), dpi=150, bbox_inches="tight",
                    pad_inches=0.08)
-    print("saved tomography_fisher.png/.pdf")
+    print(f"saved {_out('tomography_fisher.png/.pdf')}")
 
     # the scan and the AD tangent are independent routes to the same slope
     i = int(np.argmin(np.abs(grid - RES_CZ)))
