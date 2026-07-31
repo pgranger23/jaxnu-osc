@@ -436,17 +436,39 @@ def main():
           f"{bulk_marg*np.sqrt(N_EVENTS/1e5):.4f} x sqrt(1e5 / N_events)")
 
     # --- the composability one-liner: d sigma / d (angular resolution) -------
+    # sigma_core already runs jacfwd over the parameters, so grad(sigma_core)
+    # is grad-of-jacfwd: a mixed second derivative d2 mu / d theta d res.
+    # Differentiating once more gives the curvature, which says how far the
+    # tangent can be extrapolated.  It is nearly free: the inner Jacobian is
+    # already N_PAR-way forward mode, so one more tangent direction adds
+    # about 1/N_PAR of the work.
     s0 = float(sigma_core(RES_CZ))
     dsdr = float(jax.grad(sigma_core)(RES_CZ))
+    d2sdr2 = float(jax.grad(jax.grad(sigma_core))(RES_CZ))
     h = 1e-3
     fd = (float(sigma_core(RES_CZ + h)) - float(sigma_core(RES_CZ - h))) / (2 * h)
+    g = jax.jit(jax.grad(sigma_core))
+    h2 = 2e-3
+    fd2 = (float(g(RES_CZ + h2)) - float(g(RES_CZ - h2))) / (2 * h2)
     print(f"\nexperimental-design derivative (bulk core, through the matrix "
           f"inverse):")
     print(f"  sigma(bulk core) at res_cz={RES_CZ}        : {s0:.5f}")
     print(f"  d sigma / d res_cz  (autodiff)             : {dsdr:+.5f}")
     print(f"  d sigma / d res_cz  (central differences)  : {fd:+.5f}")
+    print(f"  d2 sigma / d res_cz^2  (autodiff)          : {d2sdr2:+.5f}")
+    print(f"  d2 sigma / d res_cz^2  (FD of exact grad)  : {fd2:+.5f}")
     print(f"  -> sharpening cos(theta) resolution by 0.01 reduces "
           f"sigma(bulk core) by {dsdr*0.01/s0*100:.2f}%")
+    # how far the linear extrapolation can be trusted
+    mu_t, J_t = _true_space()
+    print("  range of validity of the tangent:")
+    for dr in (0.01, 0.02, 0.05):
+        lin = s0 + dsdr * (-dr)
+        quad = lin + 0.5 * d2sdr2 * dr ** 2
+        exact = sigma_from_response(RES_CZ - dr, mu_t, J_t)
+        print(f"    sharpen by {dr:.2f}: linear {lin:.5f} ({100*abs(lin-exact)/exact:4.2f}% off)"
+              f"  quadratic {quad:.5f} ({100*abs(quad-exact)/exact:4.2f}% off)"
+              f"  exact {exact:.5f}")
 
     np.savez(_out("tomography_fisher.npz"), F=F, cov=cov, mu=mun,
              theta0=np.asarray(THETA0), labels=np.array(LABELS),
@@ -454,10 +476,12 @@ def main():
              include_antinu=INCLUDE_ANTINU)
     print(f"\nsaved {_out('tomography_fisher.npz')}")
 
-    _figure(Jn, mun, per_bin_all, frac_info, s0, dsdr, frac_bins * 100, cov)
+    _figure(Jn, mun, per_bin_all, frac_info, s0, dsdr, frac_bins * 100, cov,
+            d2sdr2)
 
 
-def _figure(Jn, mun, per_bin_all, frac_info, s0, dsdr, frac_bins_pct, cov):
+def _figure(Jn, mun, per_bin_all, frac_info, s0, dsdr, frac_bins_pct, cov,
+            d2sdr2=None):
     """Four panels: the derivative after the full chain, where the
     information lands, what the design derivative buys, and (new) the
     density-parameter correlation matrix -- the exhibit a 2-parameter density
@@ -532,15 +556,31 @@ def _figure(Jn, mun, per_bin_all, frac_info, s0, dsdr, frac_bins_pct, cov):
     grid = np.linspace(0.04, 0.20, 17)
     scan = [sigma_from_response(float(r), mu_true, J_true) for r in grid]
     ax[2].plot(grid, scan, "o-", ms=3.5, color="0.25",
-               label=r"explicit scan (17 Fisher evaluations)")
-    tan = np.linspace(RES_CZ - 0.045, RES_CZ + 0.045, 2)
+               label="explicit scan (17 evaluations)")
+    # drawn over the full scan, not just near the operating point: the whole
+    # point of the quadratic term is where the tangent stops working, and
+    # that is only visible if the tangent is extrapolated far enough to fail.
+    tan = np.linspace(grid[0], grid[-1], 2)
     ax[2].plot(tan, s0 + dsdr * (tan - RES_CZ), "r-", lw=2.2,
-               label=fr"AD tangent, $\partial\sigma/\partial\sigma_{{c}}={dsdr:.4f}$"
-                     "\n(one gradient call)")
+               label=fr"tangent: $\partial\sigma/\partial\sigma_c={dsdr:.4f}$")
+    if d2sdr2 is not None:
+        # one more nested derivative: where the tangent stops being a good
+        # extrapolation.  Drawn over the full scan so the departure is visible.
+        q = np.linspace(grid[0], grid[-1], 60)
+        ax[2].plot(q, s0 + dsdr * (q - RES_CZ) + 0.5 * d2sdr2 * (q - RES_CZ) ** 2,
+                   color="tab:blue", ls="--", lw=1.8,
+                   label=fr"$+$ curvature: $\partial^2\sigma/"
+                         fr"\partial\sigma_c^2={d2sdr2:.3f}$")
     ax[2].plot([RES_CZ], [s0], "r*", ms=13, zorder=5)
     ax[2].set_xlabel(r"angular resolution $\sigma_{\cos\theta_z}$")
     ax[2].set_ylabel(r"$\sigma(\ln\rho_{\rm core,\,bulk})$")
     ax[2].set_title("(c) experimental-design derivative", pad=14)
+    # short labels: with three entries the long "(one gradient call)"
+    # annotations no longer fit against the diagonal curve, and the cost
+    # contrast they carried is stated in the paper caption instead
+    # headroom so the three-entry legend clears the extrapolated tangent,
+    # which now runs to the top-right corner of the panel
+    ax[2].set_ylim(top=max(scan) * 1.28)
     ax[2].legend(loc="upper left", frameon=False, fontsize=11)
     ax[2].grid(alpha=0.3)
 
