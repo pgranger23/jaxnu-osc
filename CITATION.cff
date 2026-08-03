@@ -32,8 +32,11 @@ abstract: >-
   extensions.
 identifiers:
   - type: doi
-    value: "10.5281/zenodo.TODO"  # TODO: fill in once Zenodo mints the archival DOI for this release
-    description: "Zenodo archive of this software release (TODO: not yet minted)"
+    value: "10.5281/zenodo.21774110"
+    description: "Concept DOI: resolves to the latest release of jaxnu"
+  - type: doi
+    value: "10.5281/zenodo.21774111"
+    description: "Version DOI: this release (v0.2.3)"
 preferred-citation:
   # TODO: this entry describes a paper that is IN PREPARATION as of this
   # release. It is a placeholder for the eventual published/preprint
