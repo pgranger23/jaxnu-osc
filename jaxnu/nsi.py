@@ -37,9 +37,14 @@ class NSI:
     def matrix(self, n_active: int = 3) -> jax.Array:
         """Hermitian ``(n_active, n_active)`` NSI matrix (active block only)."""
         m = jnp.zeros((n_active, n_active), dtype=jnp.complex128)
-        m = m.at[0, 0].set(self.eps_ee)
-        m = m.at[1, 1].set(self.eps_mumu)
-        m = m.at[2, 2].set(self.eps_tautau)
+        # Hermiticity is by construction only if the diagonal is real: the
+        # off-diagonals are conjugate-paired below, but nothing stops a caller
+        # passing a complex eps_ee. Take the real part explicitly rather than
+        # letting a complex diagonal produce a non-Hermitian Hamiltonian and a
+        # silently wrong (complex-eigenvalue) propagation.
+        m = m.at[0, 0].set(jnp.real(jnp.asarray(self.eps_ee)))
+        m = m.at[1, 1].set(jnp.real(jnp.asarray(self.eps_mumu)))
+        m = m.at[2, 2].set(jnp.real(jnp.asarray(self.eps_tautau)))
         m = m.at[0, 1].set(self.eps_emu)
         m = m.at[1, 0].set(jnp.conj(jnp.asarray(self.eps_emu)))
         m = m.at[0, 2].set(self.eps_etau)

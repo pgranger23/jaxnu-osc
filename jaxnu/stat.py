@@ -9,7 +9,13 @@ The core object is the **Fisher information matrix** of a binned Poisson
 computed *exactly* from the model Jacobian via jaxnu autodiff (no finite
 differences). ``F`` equals the expected curvature of the Asimov chi2/2 at the
 truth, so ``sqrt(inv(F)_ii)`` is the marginalized 1-sigma forecast for
-parameter i and ``1/sqrt(F_ii)`` the fixed-others (profiled-out) bound.
+parameter i and ``1/sqrt(F_ii)`` the bound with every other parameter held
+fixed.
+
+Note the terminology: *profiling* means minimizing over the other parameters,
+which in the Gaussian limit gives the same answer as *marginalizing* -- i.e.
+``sqrt(inv(F)_ii)``, not ``1/sqrt(F_ii)``. The fixed-others number is the
+optimistic one, and is never the profiled result.
 
 Works with any parameter PyTree (e.g. :class:`jaxnu.OscParams`, or a dict mixing
 oscillation and nuisance parameters) and any model returning a PyTree of

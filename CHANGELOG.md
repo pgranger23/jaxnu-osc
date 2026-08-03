@@ -5,6 +5,34 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.2.3] - 2026-08-03
+
+### Added
+
+- **`benchmarks/bench_bsm_derivatives.py`** — dP/dgamma (Lindblad decoherence)
+  and dP/dalpha (non-unitary mixing) at the standard-model point, the figure of
+  BSM-parameter derivatives in the accompanying paper. This script and the
+  second-order design derivative below post-dated the v0.2.2 tag, so v0.2.2
+  could not reproduce two of the paper's exhibits; that is what this release
+  fixes.
+- **Second-order design derivative** in `demo_tomography_fisher.py`:
+  `d2 sigma / d res_cz^2`, giving the range over which the first-order tangent
+  can be extrapolated.
+- **Solar closed-form MSW cross-check as a unit test.** The comparison against
+  an independently written two-flavour adiabatic formula existed only as a
+  benchmark; the paper's validation table describes every row as shipped in the
+  test suite, which is now true.
+
+### Fixed
+
+- **`jaxnu.stat` terminology.** `1/sqrt(F_ii)` was described as the
+  "profiled-out" bound. Profiling means minimizing over the other parameters
+  and in the Gaussian limit coincides with *marginalizing*, i.e.
+  `sqrt(inv(F)_ii)`. The fixed-others number is never the profiled result.
+- **`NSI.matrix()` Hermiticity.** The off-diagonals were conjugate-paired but a
+  complex diagonal was passed straight through, producing a non-Hermitian
+  Hamiltonian and a silently wrong propagation. The diagonal is now taken real.
+
 ## [0.2.2] - 2026-07-30
 
 ### Fixed

@@ -99,3 +99,45 @@ def test_solar_adiabatic_unitarity_and_lma():
     assert np.allclose(F.sum(axis=1), 1.0, atol=1e-9)
     # LMA: nu_e emerges predominantly as nu_2 at the surface.
     assert F[-1, 1] > F[-1, 0] and F[-1, 1] > 0.5
+
+
+def test_solar_adiabatic_matches_closed_form_two_flavour():
+    """The cross-code row of the paper's validation table, as a test.
+
+    The reference is an independently written textbook two-flavour adiabatic
+    MSW formula with theta13 folded in by projecting out nu_3. It is a
+    genuinely different computational route from jaxnu's N x N instantaneous
+    eigenvector projection, so agreement is a real cross-check.
+
+    The residual is dominated by the *reference's* truncation, not ours: the
+    projection drops a term of order sin^2(theta13) * 2 E V_CC / dm31^2, which
+    grows linearly with energy. We therefore assert the deviation stays within
+    a few times that dropped term at each energy, rather than a flat
+    tolerance -- a flat bound would either be vacuous at 0.1 MeV or fail at
+    15 MeV for a reason that is not a jaxnu error.
+    """
+    p = nufit_no()
+    prof = solar.load_bs05(os.path.join(os.path.dirname(__file__), "..",
+                                        "examples", "data", "bs05_agsop.dat"))
+    r_emit = 0.05 * prof.R_sun_km
+    th12, th13 = float(p.theta12), float(p.theta13)
+    dm21, dm31 = float(p.dm21), abs(float(p.dm31))
+    v_cc = float(solar.potential_eV(prof, r_emit))
+    U = np.asarray(p.pmns())
+
+    for e_mev in (0.1, 1.0, 5.0, 15.0):
+        e_eV = e_mev * 1e6
+        # --- independent closed form -----------------------------------
+        a_eff = v_cc * np.cos(th13) ** 2
+        num = dm21 * np.cos(2 * th12) - 2.0 * e_eV * a_eff
+        c2m = num / np.sqrt(num ** 2 + (dm21 * np.sin(2 * th12)) ** 2)
+        p2 = 0.5 + 0.5 * np.cos(2 * th12) * c2m
+        ref = np.sin(th13) ** 4 + np.cos(th13) ** 4 * p2
+        # --- jaxnu ------------------------------------------------------
+        F = np.asarray(solar.adiabatic_mass_fractions(
+            p, e_mev * 1e-3, prof, prof.R_sun_km, r_emit, alpha=0)).ravel()
+        got = float(np.sum(F * np.abs(U[0]) ** 2))
+        # the term the reference drops
+        dropped = np.sin(th13) ** 2 * (2.0 * e_eV * v_cc) / dm31
+        assert abs(got - ref) < 3.0 * dropped, (e_mev, got, ref, dropped)
+        assert abs(got - ref) < 2e-3, (e_mev, got, ref)

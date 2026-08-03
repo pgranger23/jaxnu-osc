@@ -376,7 +376,7 @@ result (a ν_e produced in the dense core emerges predominantly as ν₂).
 
 ## Validation
 
-`python run_tests.py` (or `pytest`) — **33 checks**, including:
+`python run_tests.py` (or `pytest`) — **132 checks**, including:
 
 - vacuum two-flavor analytic limit; unitarity in vacuum & matter; CP asymmetry; MSW;
 - exact Earth chord geometry; oscillogram unitarity, no NaNs; down-going → vacuum;

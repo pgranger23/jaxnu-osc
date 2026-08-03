@@ -31,6 +31,7 @@ Drop `JAX_PLATFORMS=cpu` to let JAX pick up a visible GPU/TPU.
 | `bench_backends_and_precision.py grad` | autodiff vs. central finite differences for all three derivative classes claimed in the paper: oscillation parameters (θ13, θ23, δCP, Δm²31), geometry (cos θ_z, atmospheric production height), and matter density (core/mantle log-density scale factors) | the "10⁻⁸ level or better" gradient-validation claim (Validation section) |
 | `bench_backends_and_precision.py prec` | float32 vs float64 agreement for a PREM oscillogram, quantifying why float64 is mandatory | the "double precision is mandatory" claim (Units and precision, `README.md`) |
 | `bench_derivative_classes.py` | reverse-mode gradient cost for each derivative class through the layered PREM Earth -- oscillation parameters (6), geometry (42) and the full parameter set of a 123-shell LayeredEarth (369) -- with mean and standard deviation over independent groups, and a finite-difference check of every class | Table "Cost of a reverse-mode gradient relative to one forward evaluation" |
+| `bench_bsm_derivatives.py` | derivatives with respect to the BSM parameters themselves — dP/dgamma (Lindblad decoherence, Earth diameter) and dP/dalpha (non-unitary mixing, PREM), both at the standard-model point where a limit-setting analysis linearizes | the BSM-derivative figure |
 | `bench_bsm_comparison.py` | the adiabatic solar sector against an independently written closed-form two-flavour MSW formula (the one beyond-standard-model sector for which a non-circular check is possible without a third-party code) | the solar cross-check quoted in the beyond-standard-model section |
 | `bench_timing_and_gradients.py` | (a) the same backend timing rows as above but self-contained in one script including the NuFast port, and (b) `∂P/∂ln ρ` oscillograms for the core and mantle density — the matter-density tomography derivative that no analytic constant-density code (NuFast, Prob3++, ...) can supply | Table "Backend performance per energy point" (self-contained cross-check) and the density-derivative figure discussed in the Introduction/BSM sections |
 
@@ -60,6 +61,7 @@ compilation, which dominates for the smaller scripts:
 | `bench_backends_and_precision.py prec` | ~15-20 s | yes |
 | `bench_derivative_classes.py` | ~7 min CPU / ~1.5 min GPU | yes |
 | `bench_bsm_comparison.py` | ~1 min | yes |
+| `bench_bsm_derivatives.py` | ~1 min | yes |
 | `bench_timing_and_gradients.py` | ~5-10 min (the `∂P/∂ln ρ` oscillogram is a 110×110 grid of PREM-Earth Jacobians, `NG=110`, on CPU) | yes, but slow — see note below |
 
 None of these needed batch-size changes to finish in a reasonable time on
