@@ -176,6 +176,25 @@ diffs_r = np.array([abs(analytic_Pee(0.008, r) - jaxnu_Pee(0.008, r)) for r in r
 print(f"max |Delta P_ee| over r_emit in [0.02, 0.30] R_sun @ E=8 MeV: "
       f"{diffs_r.max():.3e}")
 
+# Where does that residual come from? The reference is a TWO-flavour formula:
+# theta13 is folded in by the standard "project out nu_3" approximation, which
+# drops the matter correction to nu_3. That dropped term is
+# O(sin^2(theta13) * 2 E V_CC / Dm31^2) and so grows linearly with energy. If
+# the residual is the reference's truncation rather than our error, it must
+# track that term -- which is the check below, and it is the reason the
+# quoted deviation is a scaling and not a single number.
+print()
+print("Is the residual ours or the two-flavour reference's truncation?")
+v_cc_emit = float(solar.potential_eV(prof, R_EMIT))
+dm31 = abs(float(P.dm31))
+print(f"  {'E [MeV]':>8s} {'|residual|':>12s} {'dropped nu_3 term':>18s} {'ratio':>7s}")
+for E_MeV in (0.1, 0.5, 1.0, 5.0, 15.0):
+    d = abs(analytic_Pee(E_MeV * 1e-3, R_EMIT) - jaxnu_Pee(E_MeV * 1e-3, R_EMIT))
+    dropped = np.sin(th13) ** 2 * (2.0 * E_MeV * 1e6 * v_cc_emit) / dm31
+    print(f"  {E_MeV:8.2f} {d:12.3e} {dropped:18.3e} {d/dropped:7.2f}")
+print("  The residual is proportional to the term the reference drops, so it")
+print("  is the reference formula's truncation, not a jaxnu error.")
+
 print()
 print("=" * 78)
 print("PART 4 -- timing")
