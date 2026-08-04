@@ -26,6 +26,7 @@ Drop `JAX_PLATFORMS=cpu` to let JAX pick up a visible GPU/TPU.
 | script | measures | paper table / figure |
 |---|---|---|
 | `demo_tomography_fisher.py` | End-to-end composability demo: propagates the density derivatives through an atmospheric flux, an (E, cos theta) histogram, a Gaussian detector response and a marginalized Poisson Fisher matrix to a tomographic sigma(ln rho_core), then differentiates that sigma through the matrix inverse with respect to the angular resolution. A demonstration of the machinery, **not** a sensitivity forecast | Section "A worked example: tomographic sensitivity end to end" |
+| `nsi_capability.py` | What the NSI derivatives are for, beyond the eps_ee/density degeneracy (which is a correctness check, not a capability demo): (a) wall-clock cost of a batched `jax.jacfwd` Jacobian vs. serialized finite differences as free NSI parameters are added to the fit; (b,c) per-bin profiled information on Re/Im eps_mutau via orthogonal projection against every other free parameter, which surfaces a ~290x real-vs-imaginary sensitivity asymmetry, cross-checked directly against dP/d(eps) away from the Fisher machinery | Section "What the NSI derivatives are for" (figure "Cost of extending the fit / per-bin profiled information") |
 | `check_bsm_limits.py` | NSI/sterile decoupling limits, unitarity, and AD-vs-finite-difference checks for the beyond-standard-model front-ends (no independent reference code exists for these, so they are validated against exact analytic limits instead) | Table "Validation of the NSI and sterile sectors through exact limits and gradient checks" |
 | `bench_backends_and_precision.py timing` | forward-evaluation throughput of the four propagation backends (`cayley`, `eigh`, `expm`, `nufast`) at constant density, plus the PREM Earth forward pass and its full 6-parameter gradient, run standalone (independent of the plotting script below) | Table "Backend performance per energy point" (the CPU column; run again on a GPU host for the A100 column) |
 | `bench_backends_and_precision.py grad` | autodiff vs. central finite differences for all three derivative classes claimed in the paper: oscillation parameters (θ13, θ23, δCP, Δm²31), geometry (cos θ_z, atmospheric production height), and matter density (core/mantle log-density scale factors) | the "10⁻⁸ level or better" gradient-validation claim (Validation section) |
@@ -63,6 +64,7 @@ compilation, which dominates for the smaller scripts:
 | `bench_bsm_comparison.py` | ~1 min | yes |
 | `bench_bsm_derivatives.py` | ~1 min | yes |
 | `bench_timing_and_gradients.py` | ~5-10 min (the `∂P/∂ln ρ` oscillogram is a 110×110 grid of PREM-Earth Jacobians, `NG=110`, on CPU) | yes, but slow — see note below |
+| `nsi_capability.py` | ~10 min CPU (nine 900-bin Jacobian assemblies, k=0..8 free NSI parameters, plus the serialized finite-difference timings at each k); `FIGONLY=1` re-renders the figure from the saved `.npz` in seconds | yes |
 
 None of these needed batch-size changes to finish in a reasonable time on
 CPU **except** `bench_timing_and_gradients.py`'s density-derivative
@@ -88,6 +90,8 @@ already visible at `NG=40`.
   `bench_backends_and_precision.py grad`.
 - `tomography_fisher.npz` — Fisher matrix, covariance and per-bin
   expected counts from `demo_tomography_fisher.py`.
+- `output/nsi_capability.npz` / `.png` / `.pdf` — cost-vs-k timings and
+  per-bin profiled NSI information maps from `nsi_capability.py`.
 - `output/jaxnu_bench2_prec.json` — float32-vs-float64 deviations from
   `bench_backends_and_precision.py prec`.
 
