@@ -173,8 +173,13 @@ def _bin_centres():
 E_C, CZ_C, DOMEGA = _bin_centres()
 
 
-def _prob_mumu(e_gev, cz, ln_sc, params, anti):
-    """P(nu_mu -> nu_mu) [or nubar_mu -> nubar_mu] with per-zone density scale."""
+def _prob_mumu(e_gev, cz, ln_sc, params, anti, eps=None):
+    """P(nu_mu -> nu_mu) [or nubar_mu -> nubar_mu] with per-zone density scale.
+
+    ``eps`` is an optional (3, 3) matter-NSI matrix. It is threaded here rather
+    than bolted on elsewhere because the whole point of the NSI study below is
+    that epsilon and the shell densities enter the same Hamiltonian term.
+    """
     sc = jnp.exp(ln_sc)                          # (N_ZONES,)
     density = _BASE_EARTH.density * sc[_ZONE_IDX]
     model = dataclasses.replace(_BASE_EARTH, density=density)
@@ -183,7 +188,8 @@ def _prob_mumu(e_gev, cz, ln_sc, params, anti):
     v_cc, _ = C.matter_potentials(rho, ye)
     s = _osc.propagate_layers(params.pmns(), params.msquared(),
                               e_gev * C.GEV_TO_EV, v_cc,
-                              L * C.KM_TO_INV_EV, anti=anti, backend="cayley")
+                              L * C.KM_TO_INV_EV, anti=anti, backend="cayley",
+                              nsi=eps)
     return _osc.prob_from_amplitude(s)[1, 1]
 
 
@@ -322,6 +328,124 @@ def sigma_core(res_cz, res_lne=RES_LNE, v=BULK_CORE_VEC):
     J = jax.jacfwd(counts)(THETA0, res_lne, res_cz)
     F = J.T @ (J / mu[:, None])
     return jnp.sqrt(v @ jnp.linalg.inv(F) @ v) / _bulk_norm(v)
+
+
+def nsi_degeneracy_study():
+    """Matter NSI and the shell densities enter the same Hamiltonian term.
+
+    H_matter = V_CC(x) [diag(1,0,0) + eps]. Scaling every shell density by
+    (1+d) and setting eps_ee = d are therefore the *same* operation, exactly,
+    not approximately. Adding eps_ee to a per-zone density fit must then leave
+    the Fisher matrix with an exactly flat direction: raise all the densities
+    and lower eps_ee to compensate.
+
+    Nothing below derives that. The Fisher matrix is assembled by automatic
+    differentiation exactly as in main(), and the degeneracy shows up on its
+    own in the eigen-decomposition. What survives is the part of the profile
+    orthogonal to it, which is the physically interesting statement: with NSI
+    free, oscillation tomography constrains the *shape* of the density profile
+    but not its overall scale.
+    """
+    from jaxnu.nsi import NSI
+
+    def shape_eps(theta, anti):
+        ln_sc = theta[:N_DENS]
+        eps = NSI(eps_ee=theta[N_PAR], eps_etau=theta[N_PAR + 1] + 0.0j).matrix(3)
+        p = dataclasses.replace(_P0, theta23=theta[IDX_TH23], dm31=theta[IDX_DM31])
+        pr = jax.vmap(_prob_mumu, in_axes=(0, 0, None, None, None, None))(
+            E_C, CZ_C, ln_sc, p, anti, eps)
+        ln_phi = theta[IDX_PHIBAR] if (anti and INCLUDE_ANTINU) else theta[IDX_PHI]
+        flux = jnp.exp(ln_phi) * (E_C / E_PIVOT) ** (-(GAMMA + theta[IDX_DGAMMA]))
+        return flux * pr * DOMEGA
+
+    def counts_eps(theta):
+        R = response(RES_LNE, RES_CZ)
+        c = R @ (_NORM_NU * shape_eps(theta, False))
+        if not INCLUDE_ANTINU:
+            return c
+        return jnp.concatenate([c, R @ (_NORM_BAR * shape_eps(theta, True))])
+
+    th0 = jnp.concatenate([THETA0, jnp.zeros(2)])
+    mu = np.asarray(counts_eps(th0))
+    J = np.asarray(jax.jacfwd(counts_eps)(th0))
+    F = J.T @ (J / mu[:, None])
+    labels = LABELS + ["eps_ee", "Re eps_etau"]
+
+    print("\n" + "=" * 70)
+    print("NSI and the density profile: an exact degeneracy, found by the "
+          "Fisher matrix")
+    print("=" * 70)
+
+    # (a) the flat direction, exhibited rather than asserted
+    w, V = np.linalg.eigh(F)
+    v0 = V[:, 0] / np.abs(V[:, 0]).max()
+    print(f"  cond(F) with eps free      : {np.linalg.cond(F):.3e}")
+    print(f"  lambda_min / lambda_max    : {w[0] / w[-1]:.3e}"
+          f"   (float64 noise floor: the direction is flat)")
+    print("  flattest direction:")
+    for lab, c in zip(labels, v0):
+        if abs(c) > 0.05:
+            print(f"      {lab:24s} {c:+.4f}")
+    print("  i.e. raise every shell density and lower eps_ee to match.")
+
+    # (b) which combinations survive. The uniform mode is the degenerate one;
+    #     the core-minus-mantle contrast is orthogonal to it by construction.
+    n_par2 = N_PAR + 2
+    uniform = np.zeros(n_par2); uniform[:N_DENS] = 1.0 / N_DENS
+    contrast = np.zeros(n_par2)
+    for i in CORE_ZONE_IDXS:
+        contrast[i] = 1.0 / len(CORE_ZONE_IDXS)
+    mantle = [i for i in range(N_DENS) if i not in CORE_ZONE_IDXS]
+    for i in mantle:
+        contrast[i] = -1.0 / len(mantle)
+    bulk = np.zeros(n_par2)
+    bulk[:N_PAR] = np.asarray(BULK_CORE_VEC)
+
+    def sigma_of(F_, v, norm):
+        """sigma along v, or None if v overlaps a flat direction.
+
+        np.linalg.pinv must NOT be used here. On a singular Fisher matrix it
+        truncates the null space, which imposes an infinitely *strong*
+        constraint on the flat direction rather than none at all, and returns a
+        sigma smaller than the non-degenerate case. The variance along v is
+        sum_i (v.e_i)^2 / lambda_i over the eigenbasis; a direction with
+        support on a null eigenvector simply has no bound.
+        """
+        lam, U = np.linalg.eigh(F_)
+        c = U.T @ v
+        flat = lam <= lam.max() * 1e-14
+        if np.any(flat) and np.sqrt((c[flat] ** 2).sum()) > 1e-6 * np.linalg.norm(c):
+            return None
+        return float(np.sqrt((c[~flat] ** 2 / lam[~flat]).sum())) / norm
+
+    F_std = F[:N_PAR, :N_PAR]                      # eps fixed at zero
+    # a Gaussian prior on eps, without which the flat direction is unbounded
+    SIG_EPS = 0.1
+    F_pri = F.copy()
+    F_pri[N_PAR, N_PAR] += 1.0 / SIG_EPS ** 2
+    F_pri[N_PAR + 1, N_PAR + 1] += 1.0 / SIG_EPS ** 2
+
+    print(f"\n  {'direction':28s} {'eps fixed':>12s} {'eps free':>12s}"
+          f" {'eps, prior ' + str(SIG_EPS):>16s}")
+    for name, v, nrm in (("uniform density scale", uniform, 1.0),
+                         ("core/mantle contrast", contrast, 1.0),
+                         ("bulk core (headline)", bulk,
+                          float(np.asarray(BULK_CORE_VEC) @ np.asarray(BULK_CORE_VEC)))):
+        fmt = lambda x: "  unbounded" if x is None else f"{x:10.4f}"
+        print(f"  {name:28s} {fmt(sigma_of(F_std, v[:N_PAR], nrm)):>12s}"
+              f" {fmt(sigma_of(F, v, nrm)):>12s}"
+              f" {fmt(sigma_of(F_pri, v, nrm)):>16s}")
+    print("\n  The uniform scale is lost entirely; the contrast is untouched.")
+    print("  With eps free, oscillation tomography measures the shape of the")
+    print("  density profile, not its normalization.")
+
+    # (c) eps_etau has a different flavor structure and is not degenerate
+    F_etau = np.delete(np.delete(F, N_PAR, 0), N_PAR, 1)     # drop eps_ee only
+    w_etau = np.linalg.eigvalsh(F_etau)
+    print(f"\n  with eps_etau free but eps_ee fixed: "
+          f"lambda_min/lambda_max = {w_etau[0] / w_etau[-1]:.3e}")
+    print("  The degeneracy is specific to eps_ee, which shares the density's")
+    print("  flavor structure. Off-diagonal NSI does not reproduce it.")
 
 
 def main():
@@ -484,6 +608,8 @@ def main():
 
     _figure(Jn, mun, per_bin_all, frac_info, s0, dsdr, frac_bins * 100, cov,
             d2sdr2)
+
+    nsi_degeneracy_study()
 
 
 def _figure(Jn, mun, per_bin_all, frac_info, s0, dsdr, frac_bins_pct, cov,
