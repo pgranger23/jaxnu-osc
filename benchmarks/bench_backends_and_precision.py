@@ -247,4 +247,41 @@ elif MODE == "degen":
     json.dump(OUT, open(os.path.join(OUTDIR, "jaxnu_bench2_degen.json"), "w"),
               indent=1)
 
+
+elif MODE == "nadir":
+    # Step-size convergence of the ONE-SIDED difference at the nadir.
+    # Central differences cannot step past cz = -1, so that single point uses a
+    # second-order one-sided formula, and its truncation error is what sets the
+    # dP/dcos(theta_z) row of the AD-vs-FD table. The paper quotes the
+    # convergence sequence; it is computed here so the sequence is reproducible
+    # rather than recalled.
+    table = _osc._earth.shell_table(4)
+    E_FIX = 5.0                       # a single representative energy
+    one = jnp.asarray(1.0)
+
+    def _p(cz_):
+        rho, ye, L = _osc._earth.chord_segments(cz_, table, h_atm_km=15.0,
+                                                det_depth_km=0.0)
+        v_cc, _ = C.matter_potentials(rho, ye)
+        s_ = _osc.propagate_layers(P.pmns(), P.msquared(), E_FIX * C.GEV_TO_EV,
+                                   v_cc, L * C.KM_TO_INV_EV, anti=False,
+                                   backend="cayley")
+        return _osc.prob_from_amplitude(s_)[1, 1]
+
+    ad = float(jax.grad(_p)(jnp.asarray(-1.0)))
+    print(f"one-sided difference at the nadir, E = {E_FIX} GeV")
+    print(f"  AD value: {ad:+.8f}")
+    seq = {}
+    for k in (4, 5, 6, 7):
+        h = 10.0 ** (-k)
+        # second-order one-sided (three-point) stencil, stepping inward only
+        f0, f1, f2 = (float(_p(jnp.asarray(-1.0 + j * h))) for j in (0, 1, 2))
+        fd = (-3.0 * f0 + 4.0 * f1 - f2) / (2.0 * h)
+        rel = abs(fd - ad) / max(abs(ad), 1e-30)
+        seq[f"1e-{k}"] = rel
+        print(f"  h = 1e-{k}:  one-sided {fd:+.8f}   rel. dev. {rel:.1e}")
+    OUT["nadir"] = dict(energy_gev=E_FIX, ad=ad, rel_dev=seq)
+    json.dump(OUT, open(os.path.join(OUTDIR, "jaxnu_bench2_nadir.json"), "w"),
+              indent=1)
+
 print("ALL STEPS DONE")
