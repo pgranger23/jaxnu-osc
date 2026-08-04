@@ -4,8 +4,8 @@ message: >-
   and, once available, the accompanying paper (see "preferred-citation").
 type: software
 title: "jaxnu: an autodiff-first neutrino oscillation engine in JAX"
-version: 0.2.3
-date-released: "2026-08-03"
+version: 0.2.4
+date-released: "2026-08-04"
 authors:
   - family-names: Granger
     given-names: Pierre

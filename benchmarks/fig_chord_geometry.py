@@ -46,7 +46,7 @@ xP, xD = x_at(r_prod, -1), x_at(r_det, +1)
 xS_in, xS_out = x_at(R_E, -1), x_at(R_E, +1)          # surface crossings
 xC_in, xC_out = x_at(R_OUTER_CORE, -1), x_at(R_OUTER_CORE, +1)
 
-plt.rcParams.update({"font.size": 15, "mathtext.fontset": "cm"})
+plt.rcParams.update({"font.size": 19, "mathtext.fontset": "cm"})
 fig, ax = plt.subplots(figsize=(7.2, 6.0))
 
 for r, fc in ((R_E, "#e6ecf2"), (R_OUTER_CORE, "#c3d0de"),
@@ -69,17 +69,17 @@ for (x0, x1), col, ls, lab in seg:
 ax.plot([0, 0], [0, r_min], color="0.25", ls="--", lw=1.1, zorder=4)
 ax.plot([0], [r_min], "o", color="0.15", ms=5, zorder=6)
 ax.plot([0], [0], "o", color="0.15", ms=4, zorder=6)
-ax.annotate(r"$r_{\min}$", xy=(0.02, r_min / 2), fontsize=16, ha="left",
+ax.annotate(r"$r_{\min}$", xy=(0.02, r_min / 2), fontsize=20, ha="left",
             va="center")
-ax.annotate("$O$", xy=(0.03, -0.075), fontsize=15, ha="left", va="center")
-ax.annotate("$C$", xy=(-0.02, r_min + 0.055), fontsize=15, ha="right",
+ax.annotate("$O$", xy=(0.03, -0.085), fontsize=19, ha="left", va="center")
+ax.annotate("$C$", xy=(-0.02, r_min + 0.055), fontsize=19, ha="right",
             va="center")
 
 # endpoints, labelled clear of the chord
 ax.plot([xP], [r_min], "o", color="0.15", ms=5, zorder=6)
 ax.plot([xD], [r_min], "o", color="0.15", ms=5, zorder=6)
-ax.annotate("$P$", xy=(xP - 0.02, r_min + 0.10), fontsize=15, ha="center")
-ax.annotate("$D$", xy=(xD + 0.09, r_min - 0.02), fontsize=15, ha="left", va="top")
+ax.annotate("$P$", xy=(xP - 0.02, r_min + 0.12), fontsize=19, ha="center")
+ax.annotate("$D$", xy=(xD + 0.10, r_min - 0.02), fontsize=19, ha="left", va="top")
 
 # the local vertical at D, and the zenith angle between it and the chord
 ux, uy = xD / r_det, r_min / r_det
@@ -93,23 +93,23 @@ _mid = np.radians(0.5 * (ang_vert + 180.0))
 ax.annotate(r"$\theta_z$",
             xy=(xD + 1.30 * _R_ARC * np.cos(_mid),
                 r_min + 1.30 * _R_ARC * np.sin(_mid)),
-            fontsize=16, ha="center", va="center")
+            fontsize=20, ha="center", va="center")
 
 # exaggerated altitude and depth, annotated away from the chord
 ax.annotate("", xy=(xP, r_min), xytext=(xS_in, r_min),
             arrowprops=dict(arrowstyle="<->", color="0.35", lw=1.0))
-ax.annotate(r"$h_{\rm atm}$", xy=((xP + xS_in) / 2 - 0.05, r_min - 0.17),
-            fontsize=14, ha="center", color="0.25")
+ax.annotate(r"$h_{\rm atm}$", xy=((xP + xS_in) / 2 - 0.05, r_min - 0.21),
+            fontsize=18, ha="center", color="0.25")
 ax.annotate("", xy=(xD, r_min), xytext=(xS_out, r_min),
             arrowprops=dict(arrowstyle="<->", color="0.35", lw=1.0))
-ax.annotate("$d$", xy=((xD + xS_out) / 2, r_min - 0.17), fontsize=14,
+ax.annotate("$d$", xy=((xD + xS_out) / 2, r_min - 0.21), fontsize=18,
             ha="center", color="0.25")
 
 ax.set_xlim(-1.30, 1.42)
 ax.set_ylim(-1.20, 1.30)
 ax.set_aspect("equal")
 ax.axis("off")
-ax.legend(loc="lower center", frameon=False, ncol=3, fontsize=13,
+ax.legend(loc="lower center", frameon=False, ncol=3, fontsize=16,
           handlelength=1.6, columnspacing=1.4, bbox_to_anchor=(0.5, -0.02))
 
 fp = os.path.join(OUTDIR, "jaxnu_chord_geometry")

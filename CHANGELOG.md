@@ -5,6 +5,28 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.2.4] - 2026-08-04
+
+### Fixed
+
+- **`jaxnu.__version__` was never bumped past 0.2.2**, so a clone of the v0.2.3
+  tag reported the wrong version. It now tracks `pyproject.toml`.
+
+### Added
+
+- **`degen` mode in `bench_backends_and_precision.py`.** The propagator error
+  at an exactly degenerate spectrum was quoted from a source comment and could
+  not be re-run. It is measured over 500 trials now, with the ensemble pinned
+  (unit spectral radius, one radian of phase) because the error scales with the
+  accumulated phase and an unnormalized ensemble does not define a number.
+- **SVD pseudo-inverse cross-check** in `demo_tomography_fisher.py`. A small
+  `F F^-1 - I` residual is a backward-error statement and does not on its own
+  bound the forward error at this condition number; an independent inversion
+  route does.
+- **Sterile level-crossing gradient check** in `check_bsm_limits.py`,
+  quantifying the one place a gradient is silently wrong.
+- **`fig_chord_geometry.py`**, the chord-construction schematic.
+
 ## [0.2.3] - 2026-08-03
 
 ### Added
