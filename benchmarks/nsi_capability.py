@@ -8,8 +8,24 @@ a capability demonstration.
 
 This script asks a different question: is there a genuine use case for
 *having* dP/d(NSI) as a first-class, cheaply-obtained derivative, rather than
-a convenience for a computation someone could do by hand? Two candidates,
-both measured rather than asserted:
+a convenience for a computation someone could do by hand? Three candidates,
+all measured rather than asserted:
+
+(0) AN EXPERIMENTAL-DESIGN DERIVATIVE FOR A BSM PARAMETER. The headline
+    result. ``demo_tomography_fisher.py`` already differentiates the
+    marginalized density uncertainty with respect to the detector's angular
+    resolution, through the Fisher matrix *and its inverse* -- a design
+    derivative with no analytic counterpart, since neither the resolution nor
+    the inverse of a Fisher matrix is a parameter of any oscillation
+    probability formula. Nothing about that trick is specific to density: the
+    same nested `jax.grad`-of-`jacfwd` applies unchanged with the target
+    vector pointing at an NSI parameter instead. This is a genuinely different
+    kind of statement than a cost comparison: not "how fast can you get this
+    number" but "how does a detector upgrade trade off between what it buys
+    for astrophysics and what it buys for new-physics reach", a question no
+    analytic pipeline can even pose, let alone answer, because it needs a
+    derivative through a matrix inverse of a quantity (the profiled NSI bound)
+    that is itself several derivatives deep in the chain.
 
 (a) COST. A realistic matter-NSI fit frees the *whole* epsilon matrix (up to
     8 real degrees of freedom here; eps_mumu is fixed, since subtracting a
@@ -158,6 +174,21 @@ if FIGONLY:
     n_e, n_cz, n_bins = int(_prev["n_e"]), int(_prev["n_cz"]), int(_prev["n_bins"])
     core_cz = float(_prev["core_cz"])
     E_C_np, CZ_C_np = _prev["E_C"], _prev["CZ_C"]
+    RES_GRID = _prev["res_grid"]
+    design_results = {
+        "Re eps_mutau": dict(s0=float(_prev["design_re_s0"]),
+                             ds_ad=float(_prev["design_re_ds_ad"]),
+                             ds_fd=float(_prev["design_re_ds_fd"]),
+                             gain_pct=float(_prev["design_re_gain_pct"]),
+                             relerr=float(_prev["design_re_relerr"]),
+                             scan=_prev["design_re_scan"]),
+        "Im eps_mutau": dict(s0=float(_prev["design_im_s0"]),
+                             ds_ad=float(_prev["design_im_ds_ad"]),
+                             ds_fd=float(_prev["design_im_ds_fd"]),
+                             gain_pct=float(_prev["design_im_gain_pct"]),
+                             relerr=float(_prev["design_im_relerr"]),
+                             scan=_prev["design_im_scan"]),
+    }
     print(f"FIGONLY: loaded {_out('nsi_capability.npz')}", flush=True)
 else:
     # =========================================================================
@@ -301,6 +332,58 @@ else:
     print(f"  (for comparison, bulk-core DENSITY direction: "
           f"{frac_core_density*100:.1f}% in core-crossing bins)")
 
+    # =========================================================================
+    # (d) an experimental-design derivative for a BSM parameter. The headline
+    # result: d sigma(NSI direction)/d(angular resolution), through the Fisher
+    # matrix AND its inverse -- the same nested jax.grad-of-jacfwd trick
+    # demo_tomography_fisher.py uses for the bulk-core density, with the
+    # target vector pointing at an NSI parameter instead. sigma_v marginalizes
+    # over every OTHER parameter (all 18 others) via the full Fisher inverse;
+    # this needs the whole (N_PAR+N_EPS) matrix built fresh at each
+    # resolution, so unlike (b)/(c) it cannot reuse the k=8 Jacobian above.
+    # =========================================================================
+    print("\n" + "=" * 78)
+    print("(d) experimental-design derivative: d sigma(NSI)/d(angular resolution)")
+    print("=" * 78)
+
+    def counts_eps_res(theta_full, res_lne, res_cz):
+        theta_std, e8 = theta_full[:D.N_PAR], theta_full[D.N_PAR:]
+        R = D.response(res_lne, res_cz)
+        c = R @ (D._NORM_NU * _shape_eps(theta_std, e8, False))
+        if not D.INCLUDE_ANTINU:
+            return c
+        return jnp.concatenate([c, R @ (D._NORM_BAR * _shape_eps(theta_std, e8, True))])
+
+    def sigma_target(res_cz, v, res_lne=D.RES_LNE):
+        theta0 = jnp.concatenate([D.THETA0, jnp.zeros(N_EPS)])
+        mu = counts_eps_res(theta0, res_lne, res_cz)
+        Jr = jax.jacfwd(counts_eps_res, argnums=0)(theta0, res_lne, res_cz)
+        Fr = Jr.T @ (Jr / mu[:, None])
+        return jnp.sqrt(v @ jnp.linalg.inv(Fr) @ v)
+
+    v_re = jnp.zeros(n_tot).at[IDX_RE_MUTAU].set(1.0)
+    v_im = jnp.zeros(n_tot).at[IDX_IM_MUTAU].set(1.0)
+
+    RES_GRID = np.linspace(0.04, 0.20, 12)
+    design_results = {}
+    for label, v in (("Re eps_mutau", v_re), ("Im eps_mutau", v_im)):
+        f = lambda r, v=v: sigma_target(r, v)
+        s0 = float(f(D.RES_CZ))
+        ds = float(jax.grad(f)(D.RES_CZ))
+        h = 1e-3
+        fd = (float(f(D.RES_CZ + h)) - float(f(D.RES_CZ - h))) / (2 * h)
+        relerr = abs(ds - fd) / abs(fd)
+        gain_pct = ds * 0.01 / s0 * 100
+        scan = np.array([float(f(float(r))) for r in RES_GRID])
+        print(f"\n  {label}:")
+        print(f"    sigma(res_cz={D.RES_CZ})   = {s0:.5f}")
+        print(f"    d sigma/d res_cz  (AD)     = {ds:+.5f}")
+        print(f"    d sigma/d res_cz  (FD)     = {fd:+.5f}  (relerr {relerr:.1e})")
+        print(f"    sharpening res_cz by 0.01 buys {gain_pct:+.2f}% on this bound")
+        design_results[label] = dict(s0=s0, ds_ad=ds, ds_fd=fd, gain_pct=gain_pct,
+                                     relerr=relerr, scan=scan)
+
+    dr = design_results
     np.savez(_out("nsi_capability.npz"),
              ks=ks, ad_ms=ad_ms, ad_sd=ad_sd, fd_ms=fd_ms, fd_sd=fd_sd,
              slope_ad=slope_ad, icpt_ad=icpt_ad,
@@ -310,12 +393,27 @@ else:
              frac_core_re=frac_core_re, frac_core_im=frac_core_im,
              frac_core_density=frac_core_density,
              E_C=E_C_np, CZ_C=CZ_C_np,
-             n_e=n_e, n_cz=n_cz, n_bins=n_bins, core_cz=core_cz)
+             n_e=n_e, n_cz=n_cz, n_bins=n_bins, core_cz=core_cz,
+             res_grid=RES_GRID,
+             design_re_s0=dr["Re eps_mutau"]["s0"],
+             design_re_ds_ad=dr["Re eps_mutau"]["ds_ad"],
+             design_re_ds_fd=dr["Re eps_mutau"]["ds_fd"],
+             design_re_gain_pct=dr["Re eps_mutau"]["gain_pct"],
+             design_re_relerr=dr["Re eps_mutau"]["relerr"],
+             design_re_scan=dr["Re eps_mutau"]["scan"],
+             design_im_s0=dr["Im eps_mutau"]["s0"],
+             design_im_ds_ad=dr["Im eps_mutau"]["ds_ad"],
+             design_im_ds_fd=dr["Im eps_mutau"]["ds_fd"],
+             design_im_gain_pct=dr["Im eps_mutau"]["gain_pct"],
+             design_im_relerr=dr["Im eps_mutau"]["relerr"],
+             design_im_scan=dr["Im eps_mutau"]["scan"])
     print(f"\nsaved {_out('nsi_capability.npz')}")
 
 
 # =============================================================================
-# figure: (a) cost-vs-k curve, (b)/(c) profiled Re/Im eps_mutau oscillograms
+# figure: (a) experimental-design derivative scan, (b)/(c) profiled Re/Im
+# eps_mutau oscillograms. The cost-vs-k curve (a)/(a) is real but a 4.3x
+# constant factor is not the headline; it is reported in the text instead.
 # =============================================================================
 import matplotlib
 matplotlib.use("Agg")
@@ -330,43 +428,61 @@ plt.rcParams.update({
 
 fig, axes = plt.subplots(1, 3, figsize=(15.5, 4.6))
 
-# (a) cost-vs-k
+# (a) experimental-design derivative: sigma(NSI direction), marginalized over
+# every other parameter through the full Fisher inverse, against the angular
+# resolution -- the same nested grad-of-jacfwd trick demo_tomography_fisher.py
+# uses for the bulk-core density (figure 5c), applied to a BSM parameter
+# instead. Plotted as sigma(res)/sigma(res0) so the ~300x scale gap between
+# Re and Im does not need a second axis; both curves start at 1 by
+# construction, and the AD tangent is drawn at that point for each.
 ax = axes[0]
-ks_f = np.asarray(ks, dtype=float)
-ax.errorbar(ks_f, ad_ms, yerr=ad_sd, fmt="o-", color="tab:blue", ms=5,
-           label="AD (1 batched jacfwd call)")
-ax.errorbar(ks_f, fd_ms, yerr=fd_sd, fmt="s-", color="tab:red", ms=5,
-           label=r"FD ($k$+12 serialized calls)")
-qs = np.linspace(0, 8, 2)
-ax.plot(qs, icpt_ad + slope_ad * qs, "--", color="tab:blue", lw=1.3, alpha=0.6)
-ax.plot(qs, icpt_fd + slope_fd * qs, "--", color="tab:red", lw=1.3, alpha=0.6)
-ax.set_xlabel(r"free NSI parameters $k$")
-ax.set_ylabel("wall time [ms]")
-ax.set_title("(a) cost of extending the fit", pad=12)
-ax.annotate(f"marginal cost:\n{slope_ad:.0f} ms/param (AD)\n"
-           f"{slope_fd:.0f} ms/param (FD)",
-           xy=(0.97, 0.30), xycoords="axes fraction", va="top", ha="right",
-           fontsize=11.5)
-ax.legend(loc="upper left", frameon=False, fontsize=11)
+colors = {"Re eps_mutau": "tab:purple", "Im eps_mutau": "tab:orange"}
+for label in ("Re eps_mutau", "Im eps_mutau"):
+    r = design_results[label]
+    scan_rel = r["scan"] / r["s0"]
+    ax.plot(RES_GRID, scan_rel, "o-", ms=4, color=colors[label],
+           label=f"{label}: scan ({len(RES_GRID)} evaluations)")
+    tan = np.linspace(RES_GRID[0], RES_GRID[-1], 2)
+    slope_rel = r["ds_ad"] / r["s0"]
+    ax.plot(tan, 1.0 + slope_rel * (tan - D.RES_CZ), "--",
+           color=colors[label], lw=1.6, alpha=0.75)
+ax.plot([D.RES_CZ], [1.0], "k*", ms=13, zorder=5)
+ax.set_xlabel(r"angular resolution $\sigma_{\cos\theta_z}$")
+ax.set_ylabel(r"$\sigma(\varepsilon)\,/\,\sigma(\varepsilon)|_{\sigma_{\cos\theta_z}=0.10}$")
+ax.set_title("(a) NSI bound vs. detector resolution", pad=12)
+gr = design_results["Re eps_mutau"]["gain_pct"]
+gi = design_results["Im eps_mutau"]["gain_pct"]
+worst_relerr = max(design_results["Re eps_mutau"]["relerr"],
+                   design_results["Im eps_mutau"]["relerr"])
+ax.annotate(f"sharpening by 0.01 buys:\n{gr:.1f}% (Re), {gi:.1f}% (Im)\n"
+           f"AD vs.\\ FD tangent agree to {worst_relerr:.0e}",
+           xy=(0.04, 0.97), xycoords="axes fraction", va="top", ha="left",
+           fontsize=11)
+ax.legend(loc="lower right", frameon=False, fontsize=10.5)
 ax.grid(alpha=0.3)
 
-# (b)/(c) profiled information oscillograms, nu channel, shared colour scale
-# so the Re/Im contrast is visually literal, not just a number in the caption
+# (b)/(c) profiled information oscillograms, nu channel. Re and Im span
+# essentially disjoint ranges (Re: 3e-4 to 1.3e3; Im: 3e-10 to 1.3e-2) --
+# nine decades apart at the low end -- so a single shared colour scale
+# clips one of the two panels to noise. Each panel gets its own scale (4
+# decades below its own peak) so its internal structure is visible; the
+# ~290x magnitude gap between them is carried by the sigma annotations and
+# the text instead of by the colour scale.
 E2 = E_C_np[:n_bins].reshape(n_e, n_cz)
 CZ2 = CZ_C_np[:n_bins].reshape(n_e, n_cz)
 info_re_nu = info_re[:n_bins].reshape(n_e, n_cz)
 info_im_nu = info_im[:n_bins].reshape(n_e, n_cz)
 
-vmax = max(info_re_nu.max(), info_im_nu.max())
-vmin = vmax * 1e-6
-norm = LogNorm(vmin=vmin, vmax=vmax)
-
-for ax, info, ttl, sig in ((axes[1], info_re_nu,
-                            r"(b) profiled info: $\mathrm{Re}\,\varepsilon_{\mu\tau}$",
-                            sigma_re),
-                           (axes[2], info_im_nu,
-                            r"(c) profiled info: $\mathrm{Im}\,\varepsilon_{\mu\tau}$",
-                            sigma_im)):
+for ax, info, ttl, sig, cbar_lbl in (
+        (axes[1], info_re_nu,
+         r"(b) profiled info: $\mathrm{Re}\,\varepsilon_{\mu\tau}$",
+         sigma_re, r"info on $\mathrm{Re}\,\varepsilon_{\mu\tau}$"),
+        (axes[2], info_im_nu,
+         r"(c) profiled info: $\mathrm{Im}\,\varepsilon_{\mu\tau}$",
+         sigma_im, r"info on $\mathrm{Im}\,\varepsilon_{\mu\tau}$")):
+    vmax = info.max()
+    vmin = vmax * 1e-4
+    norm = LogNorm(vmin=vmin, vmax=vmax)
     m = ax.pcolormesh(CZ2, E2, np.maximum(info, vmin), cmap="viridis",
                       norm=norm, shading="auto", rasterized=True)
     ax.axvline(core_cz, color="w", ls="--", lw=1.1, alpha=0.8)
@@ -377,12 +493,15 @@ for ax, info, ttl, sig in ((axes[1], info_re_nu,
     ax.annotate(fr"profiled $\sigma={sig:.3f}$", xy=(0.04, 0.95),
                xycoords="axes fraction", color="w", fontsize=12,
                fontweight="bold", va="top")
+    cb = fig.colorbar(m, ax=ax, fraction=0.052, pad=0.02, label=cbar_lbl)
+    cb.ax.tick_params(labelsize=11)
 
 axes[1].set_ylabel("energy [GeV]")
 axes[2].sharey(axes[1])
-axes[2].tick_params(labelleft=False)
-cb = fig.colorbar(m, ax=axes[1:3].tolist(), fraction=0.05, pad=0.02,
-                  label="per-bin profiled information")
+axes[2].tick_params(which="both", labelleft=False)
+axes[2].annotate(fr"$\times{sigma_im/sigma_re:.0f}$ weaker than (b)",
+                 xy=(0.97, 0.06), xycoords="axes fraction", color="w",
+                 fontsize=11, ha="right", fontweight="bold")
 
 fig.savefig(_out("nsi_capability.png"), dpi=150, bbox_inches="tight",
            pad_inches=0.08)
