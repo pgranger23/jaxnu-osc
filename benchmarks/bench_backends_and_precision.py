@@ -208,4 +208,43 @@ elif MODE == "grad":
     OUT["grad"] = res
     json.dump(OUT, open(os.path.join(OUTDIR, "jaxnu_bench2_grad.json"), "w"), indent=1)
 
+
+elif MODE == "degen":
+    # The propagator error at an EXACTLY degenerate spectrum. This number is
+    # quoted in the paper's numerical-core section; it previously existed only
+    # as a comment in jaxnu/propagator.py and could not be re-run, so it is a
+    # benchmark now. scipy is imported here and nowhere else in the package.
+    import scipy.linalg as _sla
+    from jaxnu.propagator import propagator
+
+    rng = np.random.default_rng(20260804)
+    N_TRIAL = 500
+    errs = []
+    for _ in range(N_TRIAL):
+        # random Hermitian, then force eigenvalues 0 and 1 to coincide exactly
+        a = rng.normal(size=(3, 3)) + 1j * rng.normal(size=(3, 3))
+        h = 0.5 * (a + a.conj().T)
+        w, V = np.linalg.eigh(h)
+        w[1] = w[0]                       # exact degeneracy, generic eigenvectors
+        h = (V * w) @ V.conj().T
+        h = 0.5 * (h + h.conj().T)
+        # Normalize: the propagator error scales with the accumulated phase
+        # ||h||*L, so an unnormalized ensemble does not define a number at all.
+        # Unit spectral radius and L = 1 puts the phase at O(1) rad, which
+        # isolates the eigensolver's behaviour at the degeneracy itself.
+        h = h / np.abs(np.linalg.eigvalsh(h)).max()
+        L = 1.0
+        ref = _sla.expm(-1j * h * L)
+        got = np.asarray(propagator(jnp.asarray(h), L, backend="cayley"))
+        errs.append(float(np.abs(got - ref).max()))
+    errs = np.array(errs)
+    print(f"exactly-degenerate 3x3 Hermitian, {N_TRIAL} trials, "
+          f"unit spectral radius, phase 1 rad, cayley vs scipy.linalg.expm")
+    print(f"  median |dU|  = {np.median(errs):.2e}")
+    print(f"  worst  |dU|  = {errs.max():.2e}")
+    OUT["degen"] = dict(n_trial=N_TRIAL, median=float(np.median(errs)),
+                        worst=float(errs.max()))
+    json.dump(OUT, open(os.path.join(OUTDIR, "jaxnu_bench2_degen.json"), "w"),
+              indent=1)
+
 print("ALL STEPS DONE")

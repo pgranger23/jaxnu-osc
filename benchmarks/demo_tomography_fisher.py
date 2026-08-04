@@ -410,8 +410,14 @@ def main():
     resid = np.abs(F @ cov - np.eye(len(F))).max()
     print(f"\ncondition number of F: {cond_F:.3e}")
     print(f"  max |F @ F^-1 - I| = {resid:.2e} "
-          f"(float64 eps ~1e-16; this says the inverse above is trustworthy "
-          f"despite the large condition number)")
+          f"(float64 eps ~1e-16)")
+    # A small residual is a backward-error statement; at this condition number
+    # it does not on its own bound the forward error. Compare against an
+    # independent inversion route (SVD pseudo-inverse) instead of asserting it.
+    rel_svd = float((np.abs(np.linalg.pinv(F) - cov)
+                     / np.abs(cov)).max())
+    print(f"  max relative deviation, SVD pseudo-inverse vs solve: "
+          f"{rel_svd:.2e} (this is what says the inverse is trustworthy)")
 
     # --- where does the (bulk) core information actually come from? --------
     Jv = Jn @ v                                # (n_bins_total,) dmu/d(bulk core)

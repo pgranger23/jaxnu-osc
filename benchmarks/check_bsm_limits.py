@@ -108,3 +108,33 @@ print(f"Lindblad gamma->0 recovers standard   : {d7:.2e}")
 print(f"wave packet sigma_x->inf recovers std : {d8:.2e}")
 print(f"non-unitary alpha->0 recovers standard: {d9:.2e}")
 print(f"strongly damped, unitarity preserved  : {d10:.2e}")
+
+# --- the one place a gradient is silently wrong: a sterile mass-level crossing
+# At dm41 == dm31 the 4x4 spectrum is exactly degenerate. The probability is
+# analytic there, but the sterile sector has no divided-difference kernel and
+# falls back to eigh, whose eigenvector derivatives carry 1/(lambda_i-lambda_j).
+# The failure is NOT a NaN: it is a large finite number that survives isfinite,
+# which is why the paper flags it explicitly. Quantified here so the claim in
+# the scope-and-limitations section is a measured number, not an assertion.
+from jaxnu import Sterile3plus1, probability_vacuum
+
+_dm31 = float(p.dm31)
+
+
+def _p_sterile(dm41):
+    st = Sterile3plus1(theta12=float(p.theta12), theta13=float(p.theta13),
+                       theta23=float(p.theta23), theta14=0.15, theta24=0.10,
+                       theta34=0.05, delta13=float(p.deltacp), delta24=0.0,
+                       dm21=float(p.dm21), dm31=_dm31, dm41=dm41)
+    return probability_vacuum(st, jnp.asarray(5.0), 1300.0)[1, 1]
+
+
+_ad = float(jax.grad(_p_sterile)(_dm31))            # exactly at the crossing
+_h = 1e-7 * _dm31
+_fd = float((_p_sterile(_dm31 + _h) - _p_sterile(_dm31 - _h)) / (2 * _h))
+_off = float(jax.grad(_p_sterile)(_dm31 * (1 + 1e-9)))   # just off the crossing
+print(f"sterile dm41=dm31 crossing, AD        : {_ad:+.4g}")
+print(f"  central FD at the same point        : {_fd:+.4g}"
+      f"   (ratio {_ad/_fd:.1f}x, and finite: isfinite passes)")
+print(f"  AD one part in 1e9 off the crossing : {_off:+.4g}"
+      f"   (recovers; the failure is a single point)")
