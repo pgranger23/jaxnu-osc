@@ -1,4 +1,4 @@
-"""jaxnu code paper: schematic of the chord construction.
+"""jaxnu code paper: the chord construction, drawn over the real shell table.
 
 The chord geometry is what makes the geometry derivatives possible at all:
 cos(theta_z), the production height and the detector depth enter oscillation
@@ -8,8 +8,16 @@ geometry-derivative figure, the core-crossing threshold in the tomography
 example, and the shell-grazing cusps in the limitations), so it is worth
 drawing once.
 
-Schematic only: no jaxnu call, no data. Radii are to PREM scale, but h_atm and
-the detector depth are exaggerated by ~50x to be visible at all.
+The shells and their densities are the ACTUAL ``jaxnu.earth.shell_table(4)``
+used elsewhere in the paper (43 shells), not a three-zone cartoon: the point
+that the propagation is an ordered product over many constant-density segments
+is easier to see than to assert. The chord is coloured segment by segment with
+the same density scale, so the segmentation the code performs is visible
+directly -- at cos(theta_z) = -0.90 this chord is cut into ~50 segments.
+
+Only the atmospheric height and the detector depth are exaggerated (by ~50x),
+since at true scale neither would be a visible fraction of an Earth radius;
+they are labelled as exaggerated in the figure.
 
 Run:  python benchmarks/fig_chord_geometry.py
 Artefacts go to benchmarks/output/.
@@ -21,15 +29,30 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.patches import Circle, Arc
+from matplotlib.collections import LineCollection
+from matplotlib.colors import Normalize
+
+import jaxnu.earth as earth
 
 OUTDIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "output")
 os.makedirs(OUTDIR, exist_ok=True)
 
-R_E = 1.0                    # Earth radius, normalized
-R_OUTER_CORE = 3480.0 / 6371.0
-R_INNER_CORE = 1221.5 / 6371.0
-H_ATM = 0.11                 # exaggerated
-D_DET = 0.05                 # exaggerated
+# --- the real shell table, in units of the Earth radius ---------------------
+N_SUB = 4
+_T = earth.shell_table(N_SUB)
+R_KM = earth.R_EARTH_KM
+OUTER = np.asarray(_T.outer) / R_KM             # ascending, outer[-1] = 1
+RHO = np.asarray(_T.rho)
+N_SHELL = OUTER.size
+
+R_E = 1.0
+R_INNER_CORE = 1221.5 / R_KM
+R_OUTER_CORE = earth.CORE_RADIUS_KM / R_KM
+# Exaggerated (~50x): at true scale neither is a visible fraction of R_E. Both
+# are drawn large enough that a double-headed arrow fits between the radii
+# without its heads colliding, which is what sets these values.
+H_ATM = 0.13
+D_DET = 0.12
 
 COS_TZ = -0.90               # a core-crossing trajectory
 r_det = R_E - D_DET
@@ -44,77 +67,154 @@ def x_at(r, sign):
 
 xP, xD = x_at(r_prod, -1), x_at(r_det, +1)
 xS_in, xS_out = x_at(R_E, -1), x_at(R_E, +1)          # surface crossings
-xC_in, xC_out = x_at(R_OUTER_CORE, -1), x_at(R_OUTER_CORE, +1)
 
 plt.rcParams.update({"font.size": 19, "mathtext.fontset": "cm"})
-fig, ax = plt.subplots(figsize=(7.2, 6.0))
+fig, ax = plt.subplots(figsize=(7.2, 7.2))
 
-for r, fc in ((R_E, "#e6ecf2"), (R_OUTER_CORE, "#c3d0de"),
-              (R_INNER_CORE, "#9fb2c6")):
-    ax.add_patch(Circle((0, 0), r, facecolor=fc, edgecolor="0.35", lw=1.1,
-                        zorder=1))
-ax.add_patch(Circle((0, 0), r_prod, facecolor="none", edgecolor="0.6",
-                    lw=0.8, ls=":", zorder=1))
+# --- the Earth, one filled disc per shell, coloured by density -------------
+# Each shell gets a thin edge: with 43 shells and a continuous colour map the
+# fills alone read as a smooth gradient, which is the opposite of the point.
+norm = Normalize(vmin=RHO.min(), vmax=RHO.max())
+cmap = plt.get_cmap("YlOrBr")
+# outermost first so each inner shell paints over its parent
+for i in range(N_SHELL - 1, -1, -1):
+    ax.add_patch(Circle((0, 0), OUTER[i], facecolor=cmap(norm(RHO[i])),
+                        edgecolor="white", lw=0.35,
+                        zorder=1 + (N_SHELL - i) * 0.001))
+# the three boundaries worth naming, drawn over the fills
+for r, lw in ((R_INNER_CORE, 1.0), (R_OUTER_CORE, 1.3), (R_E, 1.5)):
+    ax.add_patch(Circle((0, 0), r, facecolor="none", edgecolor="0.25", lw=lw,
+                        zorder=3))
+ax.add_patch(Circle((0, 0), r_prod, facecolor="none", edgecolor="0.55",
+                    lw=1.0, ls=":", zorder=3))
+# the detector sphere, so that d has a visible pair of surfaces to span
+ax.add_patch(Circle((0, 0), r_det, facecolor="none", edgecolor="0.45",
+                    lw=0.9, ls=(0, (5, 4)), zorder=3))
 
-# the chord, coloured by the medium each leg traverses
-seg = [((xP, xS_in), "0.45", ":", "atmosphere"),
-       ((xS_in, xC_in), "tab:red", "-", "mantle"),
-       ((xC_in, xC_out), "tab:orange", "-", "outer core"),
-       ((xC_out, xD), "tab:red", "-", None)]
-for (x0, x1), col, ls, lab in seg:
-    ax.plot([x0, x1], [r_min, r_min], color=col, ls=ls, lw=3.0, zorder=4,
-            label=lab, solid_capstyle="butt")
+# --- the chord, cut at every shell crossing and coloured by that shell -----
+# crossings: the chord of impact parameter r_min meets shell radius r at
+# x = +-sqrt(r^2 - r_min^2), so every shell above r_min contributes two.
+cuts = {xS_in, xS_out, xD}
+for r in OUTER:
+    if r > r_min:
+        cuts.add(x_at(r, -1))
+        cuts.add(x_at(r, +1))
+cuts = np.array(sorted(c for c in cuts if xS_in <= c <= xD))
 
-# closest approach and the impact parameter
-ax.plot([0, 0], [0, r_min], color="0.25", ls="--", lw=1.1, zorder=4)
-ax.plot([0], [r_min], "o", color="0.15", ms=5, zorder=6)
-ax.plot([0], [0], "o", color="0.15", ms=4, zorder=6)
-ax.annotate(r"$r_{\min}$", xy=(0.02, r_min / 2), fontsize=20, ha="left",
+# Alternating tints, NOT the density colour map: shading the chord by the same
+# scale as the shells it lies on makes it disappear into the background, and
+# the density is already carried by the fills. Alternation is what makes the
+# segment count legible at print size.
+CHORD_DARK, CHORD_LIGHT = "#12405e", "#4da3d4"
+segs = [[(a, r_min), (b, r_min)] for a, b in zip(cuts[:-1], cuts[1:])]
+cols = [CHORD_DARK if i % 2 else CHORD_LIGHT for i in range(len(segs))]
+n_seg = len(segs)
+
+# white casing so the chord separates from the orange fills at any radius
+ax.plot([xS_in, xD], [r_min, r_min], color="white", lw=7.5, zorder=4,
+        solid_capstyle="butt")
+ax.add_collection(LineCollection(segs, colors=cols, linewidths=5.0, zorder=5,
+                                 capstyle="butt"))
+# the atmospheric leg, which crosses no shell
+ax.plot([xP, xS_in], [r_min, r_min], color="0.3", lw=2.0, ls=":", zorder=5,
+        solid_capstyle="butt")
+
+# --- closest approach and the impact parameter -----------------------------
+ax.plot([0, 0], [0, r_min], color="0.15", ls="--", lw=1.2, zorder=6)
+ax.plot([0], [r_min], "o", color="0.1", ms=5, zorder=7)
+ax.plot([0], [0], "o", color="0.1", ms=4, zorder=7)
+ax.annotate(r"$r_{\min}$", xy=(-0.045, r_min * 0.5), fontsize=19, ha="right",
             va="center")
-ax.annotate("$O$", xy=(0.03, -0.085), fontsize=19, ha="left", va="center")
-ax.annotate("$C$", xy=(-0.02, r_min + 0.055), fontsize=19, ha="right",
-            va="center")
+ax.annotate("$O$", xy=(0.0, -0.075), fontsize=19, ha="center", va="top")
+# C sits ON the chord, so push its label clear of the line
+ax.annotate("$C$", xy=(-0.055, r_min + 0.045), fontsize=19, ha="right",
+            va="bottom")
 
-# endpoints, labelled clear of the chord
-ax.plot([xP], [r_min], "o", color="0.15", ms=5, zorder=6)
-ax.plot([xD], [r_min], "o", color="0.15", ms=5, zorder=6)
-ax.annotate("$P$", xy=(xP - 0.02, r_min + 0.12), fontsize=19, ha="center")
-ax.annotate("$D$", xy=(xD + 0.10, r_min - 0.02), fontsize=19, ha="left", va="top")
+# --- endpoints -------------------------------------------------------------
+ax.plot([xP], [r_min], "o", color="0.1", ms=5.5, zorder=7)
+ax.plot([xD], [r_min], "o", color="0.1", ms=5.5, zorder=7)
+ax.annotate("$P$", xy=(xP - 0.015, r_min + 0.075), fontsize=19, ha="center",
+            va="bottom")
+ax.annotate("$D$", xy=(xD + 0.055, r_min + 0.035), fontsize=19, ha="left",
+            va="bottom")
 
-# the local vertical at D, and the zenith angle between it and the chord
+# --- local vertical at D and the zenith angle ------------------------------
 ux, uy = xD / r_det, r_min / r_det
-ax.plot([xD, xD + 0.30 * ux], [r_min, r_min + 0.30 * uy], color="0.35",
-        lw=1.0, zorder=4)
+ax.plot([xD, xD + 0.30 * ux], [r_min, r_min + 0.30 * uy], color="0.3",
+        lw=1.2, zorder=6)
 ang_vert = np.degrees(np.arctan2(uy, ux))
-_R_ARC = 0.26
+_R_ARC = 0.30
 ax.add_patch(Arc((xD, r_min), _R_ARC, _R_ARC, angle=0, theta1=ang_vert,
-                 theta2=180.0, color="0.25", lw=1.2, zorder=5))
+                 theta2=180.0, color="0.15", lw=1.4, zorder=7))
 _mid = np.radians(0.5 * (ang_vert + 180.0))
 ax.annotate(r"$\theta_z$",
-            xy=(xD + 1.30 * _R_ARC * np.cos(_mid),
-                r_min + 1.30 * _R_ARC * np.sin(_mid)),
-            fontsize=20, ha="center", va="center")
+            xy=(xD + 0.85 * _R_ARC * np.cos(_mid),
+                r_min + 0.85 * _R_ARC * np.sin(_mid)),
+            fontsize=19, ha="center", va="center")
 
-# exaggerated altitude and depth, annotated away from the chord
-ax.annotate("", xy=(xP, r_min), xytext=(xS_in, r_min),
-            arrowprops=dict(arrowstyle="<->", color="0.35", lw=1.0))
-ax.annotate(r"$h_{\rm atm}$", xy=((xP + xS_in) / 2 - 0.05, r_min - 0.21),
-            fontsize=18, ha="center", color="0.25")
-ax.annotate("", xy=(xD, r_min), xytext=(xS_out, r_min),
-            arrowprops=dict(arrowstyle="<->", color="0.35", lw=1.0))
-ax.annotate("$d$", xy=((xD + xS_out) / 2, r_min - 0.21), fontsize=18,
-            ha="center", color="0.25")
+# --- h_atm and d, annotated radially at the top where the gap is clear -----
+# The previous version drew these as horizontal arrows along the chord, where
+# the two radii differ by a few percent of the span and the arrowheads
+# collided. Radially, near the top of the disc, the gap is the full
+# (exaggerated) height and the leader lines have empty space to land in.
+def _radial_pair(theta_deg, r0, r1, label, r_text, color="0.15"):
+    """Double-headed arrow spanning [r0, r1] radially, labelled outside it."""
+    th = np.radians(theta_deg)
+    c, s = np.cos(th), np.sin(th)
+    ax.annotate("", xy=(r1 * c, r1 * s), xytext=(r0 * c, r0 * s),
+                arrowprops=dict(arrowstyle="<->", color=color, lw=1.4,
+                                mutation_scale=11, shrinkA=0, shrinkB=0),
+                zorder=8)
+    ax.annotate(label, xy=(r_text * c, r_text * s), fontsize=17, color=color,
+                ha="center", va="center", zorder=8,
+                bbox=dict(boxstyle="round,pad=0.18", fc="white", ec="none",
+                          alpha=0.85))
 
-ax.set_xlim(-1.30, 1.42)
-ax.set_ylim(-1.20, 1.30)
+
+_radial_pair(108.0, R_E, r_prod, r"$h_{\rm atm}$", r_prod + 0.10)
+_radial_pair(52.0, r_det, R_E, "$d$", R_E + 0.07)
+
+ax.set_xlim(-1.42, 1.42)
+ax.set_ylim(-1.30, 1.44)
 ax.set_aspect("equal")
 ax.axis("off")
-ax.legend(loc="lower center", frameon=False, ncol=3, fontsize=16,
-          handlelength=1.6, columnspacing=1.4, bbox_to_anchor=(0.5, -0.02))
+
+# Region names go in the empty lower-left, as a legend rather than inline
+# labels: inline, "inner core" has nowhere to sit that does not collide with
+# the centre mark or the r_min line.
+from matplotlib.patches import Patch
+from matplotlib.lines import Line2D
+handles = [
+    Patch(facecolor=cmap(norm(RHO[0])), edgecolor="0.4", label="inner core"),
+    Patch(facecolor=cmap(norm(RHO[N_SHELL // 3])), edgecolor="0.4",
+          label="outer core"),
+    Patch(facecolor=cmap(norm(RHO[-4])), edgecolor="0.4", label="mantle"),
+    Line2D([0], [0], color=CHORD_DARK, lw=4,
+           label=f"chord: {n_seg} segments"),
+    Line2D([0], [0], color="0.3", lw=2, ls=":", label="atmospheric leg"),
+]
+ax.legend(handles=handles, loc="lower left", frameon=True, framealpha=0.92,
+          edgecolor="0.75", fontsize=12, handlelength=1.4,
+          borderpad=0.45, labelspacing=0.3,
+          bbox_to_anchor=(-0.025, 0.0))
+
+ax.annotate(f"PREM, {N_SHELL} shells ($n_{{\\rm sub}}={N_SUB}$)\n"
+            r"$h_{\rm atm}$, $d$ exaggerated $\sim\!50\times$",
+            xy=(0.995, 0.055), xycoords="axes fraction", fontsize=13,
+            color="0.25", ha="right", va="center", linespacing=1.4)
+
+cb = fig.colorbar(plt.cm.ScalarMappable(norm=norm, cmap=cmap), ax=ax,
+                  orientation="horizontal", fraction=0.045, pad=0.02,
+                  shrink=0.80)
+cb.set_label(r"PREM density [g cm$^{-3}$]", fontsize=15)
+cb.ax.tick_params(labelsize=13)
 
 fp = os.path.join(OUTDIR, "jaxnu_chord_geometry")
 fig.savefig(fp + ".png", dpi=200, bbox_inches="tight")
 fig.savefig(fp + ".pdf", bbox_inches="tight")
 print("saved", fp + ".pdf")
-print(f"  cos(theta_z) = {COS_TZ}, r_min/R_E = {r_min:.3f}, "
-      f"outer core at {R_OUTER_CORE:.3f} (chord crosses the core)")
+print(f"  shell table: n_sub={N_SUB} -> {N_SHELL} shells, "
+      f"rho {RHO.min():.2f}-{RHO.max():.2f} g/cm^3")
+print(f"  cos(theta_z) = {COS_TZ}, r_min/R_E = {r_min:.3f} "
+      f"(outer core at {R_OUTER_CORE:.3f}: the chord crosses the core)")
+print(f"  chord cut into {n_seg} constant-density segments")
