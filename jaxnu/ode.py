@@ -117,9 +117,18 @@ def propagate_continuous(u, msq, energy_eV, v_of_s, total_len_invEV,
 def earth_potential_fn(cz, ye=0.4957, det_depth_km=0.0):
     """Build ``v_of_s`` for an Earth chord at ``cos(zenith) = cz``.
 
-    Returns ``(v_of_s, total_len_invEV)``.  ``ye`` is taken constant here (a
-    smooth-profile demonstration); the layered backend uses the per-region
-    ``Y_e``.  Radius along the chord: ``r(s) = sqrt(r_min^2 + (s - s_turn)^2)``.
+    Returns ``(v_of_s, total_len_invEV)``.  Radius along the chord:
+    ``r(s) = sqrt(r_min^2 + (s - s_turn)^2)``.
+
+    ``ye`` is taken CONSTANT here (a smooth-profile demonstration), whereas the
+    layered backend uses the per-region value -- the core's Y_e differs from
+    the mantle's.  For a core-crossing chord the two therefore describe
+    *different physics*, not one physics by two algorithms: comparing this
+    against :func:`jaxnu.probability_earth` at ``cz = -0.9`` disagrees by up to
+    ~2e-1, against ~2e-4 once both are given the same ``ye``.  Pass the matching
+    ``ye`` (or restrict to mantle-only chords) before reading any such
+    comparison as a solver-accuracy statement.  Quantified in
+    ``benchmarks/bench_ode_backend.py``.
     """
     r_det = R_E - det_depth_km
     cz = jnp.asarray(cz, dtype=jnp.float64)
