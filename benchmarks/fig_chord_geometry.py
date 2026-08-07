@@ -31,6 +31,16 @@ import numpy as np
 from matplotlib.patches import Circle, Arc
 from matplotlib.collections import LineCollection
 from matplotlib.colors import Normalize
+import matplotlib.patheffects as pe
+
+# Interior annotations sit on saturated fills (the inner core is near-black in
+# YlOrBr), where plain black text and a plain black marker are invisible. Every
+# label and leader inside the disc gets a white halo instead of being recoloured,
+# so the same styling works over both the pale mantle and the dark core.
+HALO = [pe.withStroke(linewidth=3.2, foreground="white")]
+HALO_THIN = [pe.withStroke(linewidth=2.6, foreground="white")]
+MARKER = dict(marker="o", color="0.08", markeredgecolor="white",
+              markeredgewidth=1.3, linestyle="none")
 
 import jaxnu.earth as earth
 
@@ -101,56 +111,72 @@ for r in OUTER:
         cuts.add(x_at(r, +1))
 cuts = np.array(sorted(c for c in cuts if xS_in <= c <= xD))
 
-# Alternating tints, NOT the density colour map: shading the chord by the same
-# scale as the shells it lies on makes it disappear into the background, and
-# the density is already carried by the fills. Alternation is what makes the
-# segment count legible at print size.
-CHORD_DARK, CHORD_LIGHT = "#12405e", "#4da3d4"
-segs = [[(a, r_min), (b, r_min)] for a, b in zip(cuts[:-1], cuts[1:])]
-cols = [CHORD_DARK if i % 2 else CHORD_LIGHT for i in range(len(segs))]
-n_seg = len(segs)
+# A solid bar ruled at every shell crossing, NOT alternating bands: the bands
+# read as a dash pattern whose rhythm looks arbitrary, because segment lengths
+# here span a factor ~360. That spread is geometry, not decoration -- with
+# x = sqrt(r^2 - r_min^2) the spacing dx/dr = r/sqrt(r^2 - r_min^2) diverges as
+# r -> r_min, so near closest approach the chord runs nearly parallel to the
+# boundaries and stays inside one shell for a long path, while near the surface
+# the thin crust shells are crossed almost immediately. Rules say "divided
+# here" without implying a periodic pattern.
+# Not the density colour map either: shading the chord by the same scale as the
+# shells it lies on makes it vanish into the background.
+CHORD = "#1f5f8b"
+n_seg = len(cuts) - 1
 
 # white casing so the chord separates from the orange fills at any radius
-ax.plot([xS_in, xD], [r_min, r_min], color="white", lw=7.5, zorder=4,
+ax.plot([xS_in, xD], [r_min, r_min], color="white", lw=8.0, zorder=4,
         solid_capstyle="butt")
-ax.add_collection(LineCollection(segs, colors=cols, linewidths=5.0, zorder=5,
-                                 capstyle="butt"))
+ax.plot([xS_in, xD], [r_min, r_min], color=CHORD, lw=5.4, zorder=5,
+        solid_capstyle="butt")
+_TICK = 0.020                                  # just over the bar half-width
+ax.add_collection(LineCollection(
+    [[(x, r_min - _TICK), (x, r_min + _TICK)] for x in cuts[1:-1]],
+    colors="white", linewidths=1.0, zorder=6))
 # the atmospheric leg, which crosses no shell
 ax.plot([xP, xS_in], [r_min, r_min], color="0.3", lw=2.0, ls=":", zorder=5,
         solid_capstyle="butt")
 
 # --- closest approach and the impact parameter -----------------------------
-ax.plot([0, 0], [0, r_min], color="0.15", ls="--", lw=1.2, zorder=6)
-ax.plot([0], [r_min], "o", color="0.1", ms=5, zorder=7)
-ax.plot([0], [0], "o", color="0.1", ms=4, zorder=7)
-ax.annotate(r"$r_{\min}$", xy=(-0.045, r_min * 0.5), fontsize=19, ha="right",
-            va="center")
-ax.annotate("$O$", xy=(0.0, -0.075), fontsize=19, ha="center", va="top")
+ax.plot([0, 0], [0, r_min], color="0.12", ls="--", lw=1.4, zorder=6,
+        path_effects=HALO_THIN)
+ax.plot([0], [r_min], ms=6.5, zorder=8, **MARKER)
+ax.plot([0], [0], ms=7.5, zorder=8, **MARKER)          # O: the centre
+ax.annotate(r"$r_{\min}$", xy=(-0.055, r_min * 0.5), fontsize=19, ha="right",
+            va="center", zorder=9, path_effects=HALO)
+ax.annotate("$O$", xy=(0.075, -0.02), fontsize=19, ha="left", va="top",
+            zorder=9, path_effects=HALO)
 # C sits ON the chord, so push its label clear of the line
-ax.annotate("$C$", xy=(-0.055, r_min + 0.045), fontsize=19, ha="right",
-            va="bottom")
+ax.annotate("$C$", xy=(-0.06, r_min + 0.05), fontsize=19, ha="right",
+            va="bottom", zorder=9, path_effects=HALO)
 
 # --- endpoints -------------------------------------------------------------
-ax.plot([xP], [r_min], "o", color="0.1", ms=5.5, zorder=7)
-ax.plot([xD], [r_min], "o", color="0.1", ms=5.5, zorder=7)
-ax.annotate("$P$", xy=(xP - 0.015, r_min + 0.075), fontsize=19, ha="center",
-            va="bottom")
-ax.annotate("$D$", xy=(xD + 0.055, r_min + 0.035), fontsize=19, ha="left",
-            va="bottom")
+ax.plot([xP], [r_min], ms=6.5, zorder=8, **MARKER)
+ax.plot([xD], [r_min], ms=6.5, zorder=8, **MARKER)
+ax.annotate("$P$", xy=(xP - 0.015, r_min + 0.08), fontsize=19, ha="center",
+            va="bottom", zorder=9, path_effects=HALO)
+# D must clear the theta_z arc, which is drawn AROUND D with radius _R_ARC/2:
+# anything within that radius in the upper half collides with it. Below-right
+# of D the arc does not reach.
+ax.annotate("$D$", xy=(xD + 0.085, r_min - 0.055), fontsize=19, ha="left",
+            va="center", zorder=9, path_effects=HALO)
 
 # --- local vertical at D and the zenith angle ------------------------------
 ux, uy = xD / r_det, r_min / r_det
-ax.plot([xD, xD + 0.30 * ux], [r_min, r_min + 0.30 * uy], color="0.3",
-        lw=1.2, zorder=6)
+ax.plot([xD, xD + 0.32 * ux], [r_min, r_min + 0.32 * uy], color="0.2",
+        lw=1.4, zorder=6, path_effects=HALO_THIN)
 ang_vert = np.degrees(np.arctan2(uy, ux))
 _R_ARC = 0.30
-ax.add_patch(Arc((xD, r_min), _R_ARC, _R_ARC, angle=0, theta1=ang_vert,
-                 theta2=180.0, color="0.15", lw=1.4, zorder=7))
+_arc = Arc((xD, r_min), _R_ARC, _R_ARC, angle=0, theta1=ang_vert,
+           theta2=180.0, color="0.12", lw=1.5, zorder=7)
+_arc.set_path_effects(HALO_THIN)
+ax.add_patch(_arc)
 _mid = np.radians(0.5 * (ang_vert + 180.0))
 ax.annotate(r"$\theta_z$",
             xy=(xD + 0.85 * _R_ARC * np.cos(_mid),
                 r_min + 0.85 * _R_ARC * np.sin(_mid)),
-            fontsize=19, ha="center", va="center")
+            fontsize=19, ha="center", va="center", zorder=9,
+            path_effects=HALO)
 
 # --- h_atm and d, annotated radially at the top where the gap is clear -----
 # The previous version drew these as horizontal arrows along the chord, where
@@ -189,8 +215,8 @@ handles = [
     Patch(facecolor=cmap(norm(RHO[N_SHELL // 3])), edgecolor="0.4",
           label="outer core"),
     Patch(facecolor=cmap(norm(RHO[-4])), edgecolor="0.4", label="mantle"),
-    Line2D([0], [0], color=CHORD_DARK, lw=4,
-           label=f"chord: {n_seg} segments"),
+    Line2D([0], [0], color=CHORD, lw=4,
+           label=f"chord, ruled at each of\nits {n_seg} shell crossings"),
     Line2D([0], [0], color="0.3", lw=2, ls=":", label="atmospheric leg"),
 ]
 ax.legend(handles=handles, loc="lower left", frameon=True, framealpha=0.92,
