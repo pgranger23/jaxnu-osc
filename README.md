@@ -11,7 +11,7 @@
   <a href="https://doi.org/10.5281/zenodo.21774110"><img src="https://zenodo.org/badge/DOI/10.5281/zenodo.21774110.svg" alt="DOI"></a>
 </p>
 
-**MANGO** (**M**ultipurpose **A**utodiff **N**eutrino **G**eneric **O**scillator) is an autodiff-first neutrino oscillation calculator in [JAX](https://docs.jax.dev).
+**MANGO** (**A Neutrino Gradient Oscillator**) is an autodiff-first neutrino oscillation calculator in [JAX](https://docs.jax.dev).
 
 `mango` computes neutrino oscillation probabilities in **vacuum**, **constant-density
 matter**, **non-constant density** (the Earth via the PREM model, with an
