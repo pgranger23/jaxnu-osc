@@ -667,8 +667,9 @@ def _figure(Jn, mun, per_bin_all, frac_info, s0, dsdr, frac_bins_pct, cov,
                    xy=(0.42, 0.88), xycoords="axes fraction", color="w",
                    fontsize=10, fontweight="bold", va="top")
 
-    for a in ax[:2]:
-        a.axvline(CORE_CZ, color="k", ls="--", lw=1.4)
+    for i, a in enumerate(ax[:2]):
+        col = "w" if i == 1 else "k"
+        a.axvline(CORE_CZ, color=col, ls="--", lw=1.4)
         a.set_yscale("log")
         # ylim upper deliberately > the 2e1 major tick (not exactly on it): a
         # tick that sits exactly on the axis boundary has its label straddle
@@ -677,7 +678,7 @@ def _figure(Jn, mun, per_bin_all, frac_info, s0, dsdr, frac_bins_pct, cov,
         a.set_xlabel(r"$\cos\theta_z$ (reconstructed)")
         a.annotate("core-crossing", xy=(CORE_CZ, 19.0), xytext=(-4, 0),
                    textcoords="offset points", rotation=90, ha="right",
-                   va="top", fontsize=8.5)
+                   va="top", fontsize=8.5, color=col)
     # short label: "reconstructed" is already established by the panel title
     # and the x-axis; the full string was tall enough (rotated) to collide
     # with the title above it.
