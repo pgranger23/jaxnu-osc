@@ -6,6 +6,9 @@ automatic differentiation maps the MSW resonance band inside the solar core
 (0.02 to 0.50 R_sun) across neutrino energies 0.1 - 30 MeV, annotated with
 key solar neutrino flux regimes (pp, 7Be, pep, 8B, hep).
 
+Uses a smooth global C^infty log-density profile polynomial representation of BS05
+to ensure perfectly smooth, analytic contour lines everywhere across the core.
+
 Run from repository root:
     python benchmarks/fig_solar_autodiff.py
     FIGONLY=1 python benchmarks/fig_solar_autodiff.py   # re-render from saved npz
@@ -22,8 +25,6 @@ import numpy as np
 import jax
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
-from scipy.interpolate import UnivariateSpline
-from scipy.ndimage import gaussian_filter
 
 import jaxnu
 from jaxnu import solar, nufit_no, constants as C
@@ -41,7 +42,7 @@ FIG_PNG = os.path.join(PAPER_FIGS, "fig_solar_autodiff.png")
 FIGONLY = os.environ.get("FIGONLY", "") not in ("", "0")
 
 if not FIGONLY or not os.path.exists(NPZ_FILE):
-    print("Computing 2D solar core gradient map with smooth C^2 profile (400x350 grid)...", flush=True)
+    print("Computing 2D solar core gradient map with smooth C^infty log-profile (400x350 grid)...", flush=True)
     t0 = time.time()
 
     p = nufit_no()
@@ -51,22 +52,15 @@ if not FIGONLY or not os.path.exists(NPZ_FILE):
     else:
         prof = solar.exponential_profile()
 
-    # Use UnivariateSpline with mild smoothing to smooth out 4-digit rounding steps in bs05 table
-    spl = UnivariateSpline(prof.r_over_rsun, prof.rho_ye, s=1e-3, k=3)
-    r_knots_fine = np.linspace(0.0, 1.0, 500)
-    rho_ye_smooth = spl(r_knots_fine)
+    r = np.array(prof.r_over_rsun)
+    rho = np.array(prof.rho_ye)
+    log_rho = np.log(rho)
 
-    # Re-spline for exact C^2 evaluation
-    from scipy.interpolate import CubicSpline
-    cs = CubicSpline(r_knots_fine, rho_ye_smooth)
-    x_knots = jnp.asarray(cs.x)
-    c_coeffs = jnp.asarray(cs.c)
+    # Smooth global C^infty log-density polynomial (8th degree fit to BS05)
+    poly_coeffs = jnp.asarray(np.polyfit(r, log_rho, 8))
 
-    def jax_cubic_spline_eval(x):
-        idx = jnp.searchsorted(x_knots, x, side="right") - 1
-        idx = jnp.clip(idx, 0, len(x_knots) - 2)
-        dx = x - x_knots[idx]
-        return c_coeffs[0, idx] * dx**3 + c_coeffs[1, idx] * dx**2 + c_coeffs[2, idx] * dx + c_coeffs[3, idx]
+    def smooth_rho_ye(r_ratio):
+        return jnp.exp(jnp.polyval(poly_coeffs, r_ratio))
 
     # High-resolution energy range: 400 log-spaced points from 0.1 to 30 MeV
     energies_2d = jnp.logspace(-1, 1.48, 400)
@@ -80,8 +74,8 @@ if not FIGONLY or not os.path.exists(NPZ_FILE):
         e_gev = e_mev * 1e-3
         e_eV = e_gev * C.GEV_TO_EV
 
-        # Smooth C^2 density potential at production radius
-        rho_ye_emit = jax_cubic_spline_eval(r_ratio)
+        # Smooth C^infty density potential at production radius
+        rho_ye_emit = smooth_rho_ye(r_ratio)
         v_emit = C.matter_potential_eV(rho_ye_emit, 1.0)
 
         h_emit = jaxnu.hamiltonian.matter_hamiltonian(u, msq, e_eV, v_emit)
@@ -89,7 +83,7 @@ if not FIGONLY or not os.path.exists(NPZ_FILE):
         w = jnp.abs(vecs_emit[0, :]) ** 2
 
         # Surface potential
-        rho_ye_surf = jax_cubic_spline_eval(1.0)
+        rho_ye_surf = smooth_rho_ye(1.0)
         v_surf = C.matter_potential_eV(rho_ye_surf, 1.0)
         h_surf = jaxnu.hamiltonian.matter_hamiltonian(u, msq, e_eV, v_surf)
         _, vecs_surf = jnp.linalg.eigh(h_surf)
@@ -147,7 +141,7 @@ pc = ax.pcolormesh(radii_ratio, energies_2d, abs_g, cmap=cmap, vmin=0.0, vmax=1.
 cbar = fig.colorbar(pc, ax=ax, orientation="vertical", pad=0.02, aspect=18)
 cbar.set_label(r"Core sensitivity $|\partial P_{ee} / \partial (r_{\mathrm{emit}} / R_\odot)|$", fontsize=10.5)
 
-# Smooth contours
+# Ultra-smooth contours
 cs = ax.contour(radii_ratio, energies_2d, abs_g, levels=[0.2, 0.4, 0.7, 0.9, 1.1, 1.25], colors="black", linewidths=0.5, alpha=0.35)
 
 ax.set_yscale("log")
