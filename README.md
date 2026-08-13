@@ -1,11 +1,19 @@
-# jaxnu
+<p align="center">
+  <img src="assets/logo.png" alt="MANGO Logo" width="440"/>
+</p>
 
-[![CI](https://github.com/pgranger23/jaxnu-osc/actions/workflows/ci.yml/badge.svg)](https://github.com/pgranger23/jaxnu-osc/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+<h1 align="center">MANGO</h1>
+<h3 align="center">MANGO: A Neutrino Gradient Oscillator</h3>
 
-**A differentiable neutrino oscillation calculator in [JAX](https://docs.jax.dev).**
+<p align="center">
+  <a href="https://github.com/pgranger23/mango-osc/actions/workflows/ci.yml"><img src="https://github.com/pgranger23/mango-osc/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a>
+  <a href="https://doi.org/10.5281/zenodo.21774110"><img src="https://zenodo.org/badge/DOI/10.5281/zenodo.21774110.svg" alt="DOI"></a>
+</p>
 
-`jaxnu` computes neutrino oscillation probabilities in **vacuum**, **constant-density
+**MANGO** (**M**ultipurpose **A**utodiff **N**eutrino **G**eneric **O**scillator) is an autodiff-first neutrino oscillation calculator in [JAX](https://docs.jax.dev).
+
+`mango` computes neutrino oscillation probabilities in **vacuum**, **constant-density
 matter**, **non-constant density** (the Earth via the PREM model, with an
 atmospheric production height), arbitrary **user profiles**, and the **Sun**
 (adiabatic MSW). Everything is `jit`-compilable, `vmap`-batchable, and
@@ -29,7 +37,7 @@ core–mantle boundary at cos θ_z ≈ −0.84, and near-horizon atmospheric osc
 ## Why another oscillation code?
 
 The established fast codes (NuFast, OscProb, Prob3++, …) are excellent at forward
-evaluation but are not differentiable. `jaxnu` is built **autodiff-first**: you get
+evaluation but are not differentiable. `mango` is built **autodiff-first**: you get
 exact gradients of any probability with respect to any input for free, which is what
 you want inside a JAX fitting / HMC / neural-network pipeline. The cost of all six
 oscillation-parameter gradients is ~3–5× a single forward evaluation (vs ~12× noisy
@@ -73,9 +81,9 @@ For full control, a parametric `LayeredEarth` makes the **shell boundary radii**
 **densities** and **Y_e** all differentiable inputs:
 
 ```python
-model = jaxnu.prem_layered(n_sub=3)   # constant-density-shell Earth sampled from PREM
-P = jaxnu.probability_earth(params, E, cz, earth_model=model)
-jac = jax.jacrev(lambda m: jaxnu.probability_earth(params, E, cz, earth_model=m,
+model = mango.prem_layered(n_sub=3)   # constant-density-shell Earth sampled from PREM
+P = mango.probability_earth(params, E, cz, earth_model=model)
+jac = jax.jacrev(lambda m: mango.probability_earth(params, E, cz, earth_model=m,
                           flavor_in=Flavor.MU, flavor_out=Flavor.E))(model)
 # jac.outer -> dP/d(boundary radii), jac.density -> dP/d(shell densities), jac.ye -> ...
 ```
@@ -91,19 +99,19 @@ gradients exactly trace the radial geometry. (Matches finite differences to ~1e�
 ## Application: DUNE long-baseline sensitivity
 
 [`analyses/dune/`](analyses/dune) reproduces the **DUNE TDR oscillation analysis**
-using jaxnu for the oscillation probabilities and DUNE's official GLoBES
+using mango for the oscillation probabilities and DUNE's official GLoBES
 configuration (arXiv:2103.04797) for the flux, cross-sections, per-channel
 migration matrices, efficiencies, and systematics. The far-detector spectra match
 the reference essentially exactly, and the CP-violation and mass-ordering
 sensitivities reproduce the DUNE curves (correct shapes, peak positions, and zeros)
-— with the χ² profiled over ~15 parameters using the **exact gradient from jaxnu**
+— with the χ² profiled over ~15 parameters using the **exact gradient from mango**
 (`jax.value_and_grad` → L-BFGS). See its [README](analyses/dune/README.md).
 
 ## Installation
 
 ```bash
-git clone https://github.com/pgranger23/jaxnu-osc.git
-cd jaxnu-osc
+git clone https://github.com/pgranger23/mango-osc.git
+cd mango-osc
 pip install -e .                 # core: jax + numpy
 pip install -e ".[examples]"     # + matplotlib for the example scripts
 pip install -e ".[diffrax]"      # + diffrax for the optional stiff ODE backend
@@ -111,7 +119,7 @@ pip install -e ".[test]"         # + pytest
 ```
 
 > **Float64 is required** for oscillation phases (Δm² ~ 1e−3 eV²) and is enabled
-> automatically on `import jaxnu`.
+> automatically on `import mango`.
 
 ---
 
@@ -119,20 +127,20 @@ pip install -e ".[test]"         # + pytest
 
 ```python
 import jax, jax.numpy as jnp
-import jaxnu
-from jaxnu import nufit_no, Flavor
+import mango
+from mango import nufit_no, Flavor
 
 params = nufit_no()                       # a NuFIT-like normal-ordering point
 E  = jnp.linspace(1.0, 25.0, 200)         # GeV
 cz = jnp.linspace(-1.0, -0.05, 150)       # cos(zenith), up-going
 
 # Atmospheric oscillogram P(νμ → νe) through the Earth, shape (n_cz, n_E)
-P = jaxnu.probability_earth(params, E, cz,
+P = mango.probability_earth(params, E, cz,
                             flavor_in=Flavor.MU, flavor_out=Flavor.E)
 
 # Exact gradient w.r.t. every oscillation parameter (returns an OscParams of grads)
 def loss(p):
-    return jaxnu.probability_earth(p, jnp.asarray(4.0), jnp.asarray(-1.0),
+    return mango.probability_earth(p, jnp.asarray(4.0), jnp.asarray(-1.0),
                                    flavor_in=Flavor.MU, flavor_out=Flavor.E)
 grads = jax.grad(loss)(params)            # grads.theta23, grads.dm31, grads.deltacp, ...
 ```
@@ -145,41 +153,41 @@ pass `flavor_in` / `flavor_out` to select one channel. Antineutrinos: `anti=True
 
 ```python
 # vacuum
-jaxnu.probability_vacuum(params, E, baseline_km=295.0)                      # T2K-like
+mango.probability_vacuum(params, E, baseline_km=295.0)                      # T2K-like
 
 # constant-density matter
-jaxnu.probability_constant(params, E, baseline_km=1300.0, density=2.8, ye=0.5)  # DUNE-like
+mango.probability_constant(params, E, baseline_km=1300.0, density=2.8, ye=0.5)  # DUNE-like
 
 # PREM Earth (+ optional atmosphere); single entrypoint
-jaxnu.probability_earth(params, E, cz,
+mango.probability_earth(params, E, cz,
                         ye_core=0.466, ye_mantle=0.494,   # configurable two-zone Y_e
                         h_atm_km=15.0,                    # production height -> full cosz
                         n_sub=4, det_depth_km=0.0)
 
 # arbitrary piecewise-constant profile (source -> detector ordering)
-jaxnu.probability_profile(params, E, density_gcc=[...], ye=[...], length_km=[...])
+mango.probability_profile(params, E, density_gcc=[...], ye=[...], length_km=[...])
 
 # solar adiabatic MSW: vacuum mass-state fractions vs radius
-prof = jaxnu.solar.load_bs05("examples/data/bs05_agsop.dat")
-F = jaxnu.solar.adiabatic_mass_fractions(params, E_GeV, prof, r_km, r_emit_km)
+prof = mango.solar.load_bs05("examples/data/bs05_agsop.dat")
+F = mango.solar.adiabatic_mass_fractions(params, E_GeV, prof, r_km, r_emit_km)
 ```
 
 ### NSI and sterile neutrinos
 
 ```python
 # matter NSI: an epsilon_{alpha beta} object on any probability function
-P = jaxnu.probability_constant(params, E, 1300.0, density=2.8,
-                               nsi=jaxnu.NSI(eps_emu=0.1 + 0.05j, eps_ee=0.05))
+P = mango.probability_constant(params, E, 1300.0, density=2.8,
+                               nsi=mango.NSI(eps_emu=0.1 + 0.05j, eps_ee=0.05))
 
 # 3+1 sterile (flavors e, mu, tau, s); the matter potential automatically gives
 # sterile flavors only the relative neutral-current term; backend auto-switches to eigh
-st = jaxnu.Sterile3plus1(theta12, theta13, theta23, theta14, theta24, theta34,
+st = mango.Sterile3plus1(theta12, theta13, theta23, theta14, theta24, theta34,
                          delta13, delta24, dm21, dm31, dm41)
-P = jaxnu.probability_earth(st, E, cz)            # (n_cz, n_E, 4, 4)
+P = mango.probability_earth(st, E, cz)            # (n_cz, n_E, 4, 4)
 
 # arbitrary 3+N via the generic builder
-U = jaxnu.pmns_nflavor(5, [(3, 4, 0.1), (2, 4, 0.05), ..., (0, 1, theta12)])
-params5 = jaxnu.NFlavorParams(U=U, msq=jnp.array([0, dm21, dm31, dm41, dm51]), n_active=3)
+U = mango.pmns_nflavor(5, [(3, 4, 0.1), (2, 4, 0.05), ..., (0, 1, theta12)])
+params5 = mango.NFlavorParams(U=U, msq=jnp.array([0, dm21, dm31, dm41, dm51]), n_active=3)
 ```
 
 Both NSI and sterile parameters are differentiable leaves — `jax.grad` works through
@@ -189,13 +197,13 @@ Both NSI and sterile parameters are differentiable leaves — `jax.grad` works t
 
 ```python
 # Lindblad decoherence Gamma_ij = gamma_ij (E/E0)^n, or wave-packet separation
-P = jaxnu.decoherence.probability(params, E, L, jaxnu.Decoherence(gamma21=1e-14, n=0),
+P = mango.decoherence.probability(params, E, L, mango.Decoherence(gamma21=1e-14, n=0),
                                   density=2.8)
-P = jaxnu.decoherence.probability(params, E, L, jaxnu.WavePacket(sigma_x_m=2e-13))
+P = mango.decoherence.probability(params, E, L, mango.WavePacket(sigma_x_m=2e-13))
 
 # non-unitary mixing N = (1 - alpha) U: zero-distance effect + non-cancelling
 # NC matter term included
-P = jaxnu.nonunitarity.probability(params, jaxnu.NonUnitarity(alpha21=0.02 + 0.01j),
+P = mango.nonunitarity.probability(params, mango.NonUnitarity(alpha21=0.02 + 0.01j),
                                    E, L, density=2.8)
 ```
 
@@ -222,13 +230,13 @@ vanishing as L→0. ([examples/nonunitarity_plot.py](examples/nonunitarity_plot.
 
 ### Loading GLoBES experiments (a "differentiable GLoBES")
 
-`jaxnu.globes` parses a GLoBES/AEDL experiment definition — includes, channels,
+`mango.globes` parses a GLoBES/AEDL experiment definition — includes, channels,
 rules, migration matrices or analytic Gaussian smearing, efficiencies,
 normalization systematics, matter profile — and turns it into a differentiable
 forward model:
 
 ```python
-exp = jaxnu.globes.load("DUNE_GLoBES.glb", scale=1.21)
+exp = mango.globes.load("DUNE_GLoBES.glb", scale=1.21)
 spectra = exp.spectra(params)                 # dict rule -> reco spectrum
 chi2 = exp.chi2(params, xi, data)             # Poisson + norm systematics
 grad = jax.grad(lambda p: exp.spectra(p)["nue_app"].sum())(params)
@@ -241,15 +249,15 @@ See the module docstring for the supported AEDL subset.
 
 ![DUNE spectra from the GLoBES loader](examples/dune_globes.jpg)
 
-*The classic DUNE TDR figure straight from `jaxnu.globes.load`: νe / ν̄e
+*The classic DUNE TDR figure straight from `mango.globes.load`: νe / ν̄e
 appearance for δ_CP = −π/2, 0, +π/2 (note the CP effect flipping sign between
 neutrino and antineutrino modes), backgrounds shaded.
 ([examples/dune_globes_plot.py](examples/dune_globes_plot.py))*
 
-### Fisher forecasts and Bayesian fits (`jaxnu.stat`)
+### Fisher forecasts and Bayesian fits (`mango.stat`)
 
 ```python
-F = jaxnu.stat.fisher_matrix(model, params)     # exact Poisson Fisher via autodiff
+F = mango.stat.fisher_matrix(model, params)     # exact Poisson Fisher via autodiff
 F = F.with_prior("theta13", 0.002)              # reactor constraint
 F.sigma("deltacp")                              # marginalized 1-sigma forecast
 F.fixed("dm31").sigma("deltacp")                # conditional bound
@@ -258,7 +266,7 @@ F.fixed("dm31").sigma("deltacp")                # conditional bound
 The Fisher matrix equals the Asimov-χ² curvature (tested), and pairs naturally
 with gradient-based samplers: [examples/hmc_posterior.py](examples/hmc_posterior.py)
 runs a blackjax **NUTS** posterior of (θ₂₃, θ₁₃, Δm²₃₁, δ_CP) for a DUNE-like
-experiment using exact jaxnu gradients and overlays the analytic Fisher ellipses:
+experiment using exact mango gradients and overlays the analytic Fisher ellipses:
 
 ![HMC posterior vs Fisher](examples/hmc_posterior.jpg)
 
@@ -357,7 +365,7 @@ benchmarking confirmed the sequential scan wins on CPU, so it is the CPU default
 ### Continuous (ODE) backend (`ode.py`)
 
 For arbitrary smooth profiles (and as an independent cross-check of the layer
-method), `jaxnu.ode` integrates `dS/ds = −iH(s)S` directly. Two solvers: `odeint`
+method), `mango.ode` integrates `dS/ds = −iH(s)S` directly. Two solvers: `odeint`
 (default, no extra dependency) and an optional **diffrax** backend
 (`backend="diffrax"`, `solver="dopri8"`/`"kvaerno5"`/…) with stiff/implicit solvers
 and checkpointed adjoints — most useful for hard profiles (e.g. supernovae). The
@@ -394,7 +402,7 @@ result (a ν_e produced in the dense core emerges predominantly as ν₂).
 | vs **NuFast** (C++) | 5e−13 (constants aligned) | ~1e−5 (converged) |
 
 The residual vs NuFast is fully explained by NuFast's 6-significant-figure constants;
-jaxnu and OscProb (which share first-principles constants) agree to ~1e−9 despite
+mango and OscProb (which share first-principles constants) agree to ~1e−9 despite
 completely different propagators. Reference values are embedded as regression tests
 (`tests/test_oscprob_reference.py`, `tests/test_nufast_reference.py`).
 
@@ -411,24 +419,24 @@ the NSI and sterile front-ends.
 
 ## Performance (Apple M3 Pro, CPU, float64)
 
-| workload | jaxnu | NuFast (C++) | OscProb (C++) |
+| workload | mango | NuFast (C++) | OscProb (C++) |
 |---|---|---|---|
 | constant density, P(νμ→νe) | **37–94 Mevals/s** (`nufast` backend) | 28 | 14 |
 | PREM Earth oscillogram | ~0.04–0.07 Mevals/s | 51 | 0.5 |
 | all 6 param gradients | **2.9–5.4× a forward eval** (exact) | n/a (finite diff ≈ 12×) | n/a |
 
-`jaxnu` matches or beats the hand-optimized C++ for the constant-density/LBL case
+`mango` matches or beats the hand-optimized C++ for the constant-density/LBL case
 (the `nufast` backend is a single analytic formula, no scan). For PREM Earth on CPU
 it is much slower: the cost is XLA per-op overhead on the sequential scan of tiny 3×3
 ops, not the algorithm — NuFast-Earth's analytic per-layer machinery is in a
-different class on CPU. jaxnu's Earth value is differentiability + GPU/TPU batching
+different class on CPU. mango's Earth value is differentiability + GPU/TPU batching
 (where the gap closes). See [DESIGN.md](DESIGN.md) §11 for the GPU-oriented
 NuFast-Earth roadmap item.
 
 ### Reproducing the paper's benchmark tables
 
 [`benchmarks/`](benchmarks) has standalone, self-contained scripts (only
-`jaxnu`/`numpy`/`jax`/`matplotlib`) that reproduce every performance and
+`mango`/`numpy`/`jax`/`matplotlib`) that reproduce every performance and
 validation table in the accompanying paper, plus a README mapping each
 script to the table/figure it reproduces. The paper's own absolute numbers
 were measured on 8 cores of an AMD EPYC 7542 (CPU) and one NVIDIA A100 (GPU);
@@ -440,7 +448,7 @@ ordering of the backends.
 ## Module map
 
 ```
-jaxnu/
+mango/
   constants.py   physical constants + unit conversions + matter potentials
   params.py      OscParams PyTree (differentiable leaves) + a benchmark point
   pmns.py        generic N-flavor PMNS construction
@@ -477,19 +485,19 @@ jaxnu/
 ## References & acknowledgements
 
 - **PREM.** Dziewonski & Anderson, *Phys. Earth Planet. Inter.* **25** (1981) 297.
-  `jaxnu/earth.py` implements the PREM density as piecewise polynomials in
+  `mango/earth.py` implements the PREM density as piecewise polynomials in
   radius, from the coefficients tabulated in that paper.
 - **NuFast / DMP.** Denton & Parke, *Phys. Rev. D* **110** (2024) 073005
   (arXiv:2405.02400); see also Denton, Minakata & Parke (arXiv:1604.08167) for
-  the underlying "Rosetta" relations. `jaxnu/nufast.py`'s `nufast` backend is a
+  the underlying "Rosetta" relations. `mango/nufast.py`'s `nufast` backend is a
   **close, line-by-line JAX transcription of the reference C++ implementation**
   that the authors publish alongside the paper as
   [NuFast-LBL](https://github.com/PeterDenton/NuFast-LBL) — the intermediate
-  variable naming in `jaxnu/nufast.py` tracks that source closely enough that
+  variable naming in `mango/nufast.py` tracks that source closely enough that
   this is a port, not an independent re-derivation from the formulas with new
   structure. NuFast-LBL is itself MIT-licensed (Copyright (c) 2024 Peter B.
   Denton); this port is used under the terms of that license, with the original
-  authors' copyright credited here and in `jaxnu/nufast.py`'s module docstring.
+  authors' copyright credited here and in `mango/nufast.py`'s module docstring.
   If you use the `nufast` backend, please also cite Denton & Parke (2024) as the
   original authors request. The NuFast-LBL MIT licence is reproduced verbatim in
   [`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md), as its terms require.
@@ -501,8 +509,8 @@ jaxnu/
 - **Solar profile.** Bahcall, Serenelli & Basu, BS05(AGS,OP) standard solar
   model (astro-ph/0412440); the table shipped at
   [`examples/data/bs05_agsop.dat`](examples/data/bs05_agsop.dat) is that
-  published model's own data file, used as input to `jaxnu.solar.load_bs05`
-  (`jaxnu/solar.py`), which is otherwise an independent implementation of the
+  published model's own data file, used as input to `mango.solar.load_bs05`
+  (`mango/solar.py`), which is otherwise an independent implementation of the
   textbook averaged-adiabatic MSW formula.
 
 See [`CITATION.cff`](CITATION.cff) for how to cite this software (and the
@@ -520,18 +528,18 @@ Publishing is automated via GitHub Actions
 
 | field | value |
 |-------|-------|
-| PyPI Project Name | `jaxnu` |
+| PyPI Project Name | `mango` |
 | Owner | `pgranger23` |
-| Repository name | `jaxnu-osc` |
+| Repository name | `mango-osc` |
 | Workflow name | `publish.yml` |
 | Environment name | `pypi` |
 
 **To cut a release:**
 
-1. Bump the version in `pyproject.toml` **and** `jaxnu/__init__.py`, commit, push.
+1. Bump the version in `pyproject.toml` **and** `mango/__init__.py`, commit, push.
 2. Tag and publish a GitHub Release: e.g. `git tag v0.1.0 && git push origin v0.1.0`,
    then create a Release for that tag (or `gh release create v0.1.0 --generate-notes`).
-3. The workflow builds the sdist + wheel and publishes to PyPI → `pip install jaxnu`.
+3. The workflow builds the sdist + wheel and publishes to PyPI → `pip install mango`.
 
 (You can dry-run the build locally with `python -m build && twine check dist/*`.)
 
