@@ -192,9 +192,8 @@ def _radial_pair(theta_deg, r0, r1, label, r_text, color="0.15"):
                                 mutation_scale=11, shrinkA=0, shrinkB=0),
                 zorder=8)
     ax.annotate(label, xy=(r_text * c, r_text * s), fontsize=17, color=color,
-                ha="center", va="center", zorder=8,
-                bbox=dict(boxstyle="round,pad=0.18", fc="white", ec="none",
-                          alpha=0.85))
+                ha="center", va="center", zorder=9,
+                path_effects=HALO)
 
 
 _radial_pair(108.0, R_E, r_prod, r"$h_{\rm atm}$", r_prod + 0.10)
