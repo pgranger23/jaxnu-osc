@@ -735,16 +735,6 @@ def _figure(Jn, mun, per_bin_all, frac_info, s0, dsdr, frac_bins_pct, cov,
                 txt_color = "white" if abs(corr[i, j]) > 0.6 else "black"
                 ax[3].text(j, i, f"{corr[i,j]:+.2f}", ha="center", va="center",
                           fontsize=9.5, color=txt_color)
-        # highlight the core-zone/core-zone off-diagonal cell(s): the
-        # degeneracy a 2-parameter model could not show (e.g. inner-core vs
-        # outer-core for N_ZONES=6; a no-op for N_ZONES=2, only one core zone).
-        if IS_MULTI_ZONE_CORE:
-            from matplotlib.patches import Rectangle
-            i0, i1 = CORE_ZONE_IDXS[0], CORE_ZONE_IDXS[1]
-            ax[3].add_patch(Rectangle((i1 - 0.5, i0 - 0.5), 1, 1, fill=False,
-                                      edgecolor="lime", lw=2.5))
-            ax[3].add_patch(Rectangle((i0 - 0.5, i1 - 0.5), 1, 1, fill=False,
-                                      edgecolor="lime", lw=2.5))
         plt.colorbar(m, ax=ax[3], label="correlation coefficient", shrink=0.85)
         ax[3].set_title("(d) density-zone correlations", pad=14)
     else:
