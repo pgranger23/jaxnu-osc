@@ -1,8 +1,8 @@
 """fig_solar_autodiff.py: Consolidated 2-Panel Solar Neutrino Automatic Differentiation Benchmark.
 
-Combines:
-  Panel (a): LMA Survival Probability P_ee(E), exact AD sensitivities (dP/dtheta12, dP/d(dm21),
-             dP/d ln N0), and finite-difference validation markers (10^-10 agreement).
+Combines into a clean 1x2 side-by-side square panel layout:
+  Panel (a): Exact AD parameter sensitivities (dP/dtheta12, dP/d(dm21), dP/d ln N0)
+             overlaid with finite-difference validation markers (10^-10 agreement).
   Panel (b): 2D Functional Solar Core Tomography Kernel |dP_ee / d ln N_e(r)| across 80 spatial
              radius shells computed in a single reverse-mode VJP pass.
 
@@ -39,7 +39,7 @@ FIG_PNG = os.path.join(PAPER_FIGS, "fig_solar_autodiff.png")
 FIGONLY = os.environ.get("FIGONLY", "") not in ("", "0")
 
 if not FIGONLY or not os.path.exists(NPZ_FILE):
-    print("Computing consolidated 2-panel solar AD benchmark data...", flush=True)
+    print("Computing consolidated 1x2 solar AD benchmark data...", flush=True)
     t0 = time.time()
 
     p = nufit_no()
@@ -181,47 +181,36 @@ energies_2d = data["energies_2d"]
 r_grid = data["r_grid"]
 K_matrix = data["K_matrix"]
 
-# --- Plotting Standalone Figure with Consistent Manuscript Styling ---
+# --- Plotting Standalone 1x2 Side-by-Side Figure ---
 plt.rcParams.update(
     {
-        "font.size": 16,
-        "axes.titlesize": 17,
-        "axes.labelsize": 16,
-        "xtick.labelsize": 14,
-        "ytick.labelsize": 14,
-        "legend.fontsize": 13,
+        "font.size": 14,
+        "axes.titlesize": 15,
+        "axes.labelsize": 14,
+        "xtick.labelsize": 12.5,
+        "ytick.labelsize": 12.5,
+        "legend.fontsize": 11,
         "axes.linewidth": 1.2,
         "lines.linewidth": 2.0,
     }
 )
 
-fig = plt.figure(figsize=(11.0, 9.8))
-gs = fig.add_gridspec(3, 1, height_ratios=[0.85, 1.15, 1.30], hspace=0.32)
-ax_prob = fig.add_subplot(gs[0])
-ax_sens = fig.add_subplot(gs[1], sharex=ax_prob)
-ax_tomo = fig.add_subplot(gs[2])
+fig, axes = plt.subplots(1, 2, figsize=(12.8, 5.2))
+fig.subplots_adjust(left=0.08, right=0.92, top=0.91, bottom=0.14, wspace=0.32)
 
-fig.subplots_adjust(left=0.11, right=0.88, top=0.94, bottom=0.08)
+ax_sens = axes[0]
+ax_tomo = axes[1]
 
-# --- PANEL (a1): Survival Probability P_ee(E) ---
-ax_prob.plot(energies_1d, p_1d, color="tab:blue", lw=2.2, label=r"$P_{ee}(E)$ MSW transition")
-ax_prob.set_ylabel(r"probability $P_{ee}$")
-ax_prob.set_ylim(0.25, 0.62)
-ax_prob.grid(True, which="both", ls=":", lw=0.4, alpha=0.6, color="gray")
-ax_prob.legend(loc="upper right", framealpha=0.9)
-ax_prob.set_title(r"(a) solar LMA survival probability & AD sensitivities", pad=10)
-plt.setp(ax_prob.get_xticklabels(), visible=False)
-
-# --- PANEL (a2): AD Parameter Sensitivities & FD Benchmarks ---
+# --- PANEL (a): AD Parameter Sensitivities & FD Benchmarks ---
 line1, = ax_sens.plot(energies_1d, grad_t12, color="tab:blue", lw=2.0, label=r"$\partial P_{ee}/\partial\theta_{12}$")
-ax_sens.plot(fd_energies, fd_t12, "o", color="tab:blue", ms=6, mec="black", mew=0.6, zorder=5, label=r"FD benchmark ($10^{-10}$ match)")
+ax_sens.plot(fd_energies, fd_t12, "o", color="tab:blue", ms=5.5, mec="black", mew=0.6, zorder=5, label=r"FD benchmark ($10^{-10}$ match)")
 
 line2, = ax_sens.plot(energies_1d, np.abs(grad_n0), color="tab:green", lw=2.0, label=r"$|\partial P_{ee}/\partial\ln N_e(0)|$")
-ax_sens.plot(fd_energies, np.abs(fd_n0), "s", color="tab:green", ms=5.5, mec="black", mew=0.6, zorder=5)
+ax_sens.plot(fd_energies, np.abs(fd_n0), "s", color="tab:green", ms=5.0, mec="black", mew=0.6, zorder=5)
 
 ax_sens2 = ax_sens.twinx()
 line3, = ax_sens2.plot(energies_1d, grad_dm21 * 1e-3, color="tab:red", lw=2.0, label=r"$\partial P_{ee}/\partial(\Delta m^2_{21})\ [\times 10^3\,\text{eV}^{-2}]$")
-ax_sens2.plot(fd_energies, np.array(fd_dm21) * 1e-3, "^", color="tab:red", ms=6, mec="black", mew=0.6, zorder=5)
+ax_sens2.plot(fd_energies, np.array(fd_dm21) * 1e-3, "^", color="tab:red", ms=5.5, mec="black", mew=0.6, zorder=5)
 
 ax_sens.set_xscale("log")
 ax_sens.set_xlim(0.1, 30.0)
@@ -235,25 +224,26 @@ ax_sens.grid(True, which="both", ls=":", lw=0.4, alpha=0.6, color="gray")
 # Combine legends
 lines = [line1, line2, line3]
 labels_leg = [l.get_label() for l in lines]
-ax_sens.legend(lines, labels_leg, loc="upper right", framealpha=0.9, fontsize=12)
+ax_sens.legend(lines, labels_leg, loc="upper right", framealpha=0.9, fontsize=10.5)
 
 # Annotate MSW resonance spike
 ax_sens.annotate(
     "MSW resonance spike\n" + r"($E = 4.41\text{ MeV}$, $1.68\times 10^3\text{ eV}^{-2}$)",
     xy=(4.41, 0.45),
-    xytext=(0.15, 0.42),
-    arrowprops=dict(arrowstyle="->", color="tab:red", lw=1.5),
-    fontsize=12,
+    xytext=(0.14, 0.38),
+    arrowprops=dict(arrowstyle="->", color="tab:red", lw=1.3),
+    fontsize=10.5,
     color="tab:red",
     fontweight="bold",
-    bbox=dict(boxstyle="round,pad=0.3", fc="#fbe8e8", ec="tab:red", lw=1.0),
+    bbox=dict(boxstyle="round,pad=0.25", fc="#fbe8e8", ec="tab:red", lw=0.9),
 )
+ax_sens.set_title(r"(a) solar parameter sensitivities & FD benchmark", pad=10)
 
 # --- PANEL (b): 2D Functional Core Tomography Kernel ---
 abs_K = np.abs(K_matrix)
 pc = ax_tomo.pcolormesh(r_grid, energies_2d, abs_K, cmap=plt.cm.Blues, shading="gouraud")
 
-cbar = fig.colorbar(pc, ax=ax_tomo, orientation="vertical", pad=0.02, aspect=18)
+cbar = fig.colorbar(pc, ax=ax_tomo, orientation="vertical", pad=0.03, aspect=18)
 cbar.set_label(r"functional kernel $\left|\frac{\delta P_{ee}}{\delta \ln N_e(r)}\right|$")
 
 cs = ax_tomo.contour(r_grid, energies_2d, abs_K, levels=[0.01, 0.03, 0.06, 0.09, 0.11], colors="navy", linewidths=0.6, alpha=0.45)
@@ -267,31 +257,31 @@ ax_tomo.grid(True, which="both", ls=":", lw=0.4, alpha=0.6, color="gray")
 
 # Reference energy lines
 ax_tomo.axhline(0.42, color="tab:green", ls="--", lw=1.0, alpha=0.8)
-ax_tomo.text(0.34, 0.45, r"$pp$ end", color="tab:green", fontsize=12, ha="right", fontweight="bold",
+ax_tomo.text(0.34, 0.45, r"$pp$ end", color="tab:green", fontsize=10.5, ha="right", fontweight="bold",
              bbox=dict(boxstyle="round,pad=0.2", fc="white", ec="none", alpha=0.85))
 
 ax_tomo.axhline(0.86, color="tab:red", ls="--", lw=1.0, alpha=0.8)
-ax_tomo.text(0.34, 0.92, r"$^7\mathrm{Be}$", color="tab:red", fontsize=12, ha="right", fontweight="bold",
+ax_tomo.text(0.34, 0.92, r"$^7\mathrm{Be}$", color="tab:red", fontsize=10.5, ha="right", fontweight="bold",
              bbox=dict(boxstyle="round,pad=0.2", fc="white", ec="none", alpha=0.85))
 
 ax_tomo.axhline(18.8, color="tab:brown", ls="--", lw=1.0, alpha=0.8)
-ax_tomo.text(0.34, 19.8, r"$hep$ end", color="tab:brown", fontsize=12, ha="right", fontweight="bold",
+ax_tomo.text(0.34, 19.8, r"$hep$ end", color="tab:brown", fontsize=10.5, ha="right", fontweight="bold",
              bbox=dict(boxstyle="round,pad=0.2", fc="white", ec="none", alpha=0.85))
 
 ax_tomo.annotate(
     "functional core tomography window\n" + r"(80 radial shells in 1 VJP pass)",
     xy=(0.05, 4.4),
-    xytext=(0.11, 2.2),
-    arrowprops=dict(arrowstyle="->", color="#08519c", lw=1.5),
-    fontsize=12,
+    xytext=(0.095, 2.2),
+    arrowprops=dict(arrowstyle="->", color="#08519c", lw=1.3),
+    fontsize=9.5,
     color="#08519c",
     fontweight="bold",
-    bbox=dict(boxstyle="round,pad=0.3", fc="#eff3ff", ec="#08519c", lw=1.0),
+    bbox=dict(boxstyle="round,pad=0.25", fc="#eff3ff", ec="#08519c", lw=0.9),
 )
 
-ax_tomo.set_title(r"(b) functional solar core tomography kernel $\delta P_{ee} / \delta \ln N_e(r)$ via reverse-mode VJP", pad=10)
+ax_tomo.set_title(r"(b) functional core tomography kernel via VJP", pad=10)
 
 # Save consolidated outputs
 fig.savefig(FIG_PDF, dpi=300, bbox_inches="tight")
 fig.savefig(FIG_PNG, dpi=300, bbox_inches="tight")
-print(f"Saved styled consolidated 2-panel figure to {FIG_PDF} and {FIG_PNG}")
+print(f"Saved 1x2 side-by-side square panel figure to {FIG_PDF} and {FIG_PNG}")
