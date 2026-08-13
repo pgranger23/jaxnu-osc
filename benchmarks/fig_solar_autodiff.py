@@ -1,8 +1,8 @@
 """fig_solar_autodiff.py: Standalone 2D functional sensitivity map of the solar interior core
 |\partial P_{ee} / \partial (r_{\rm emit} / R_\odot)|.
 
-Generates a focused, high-statistics publication-quality single-panel figure showing
-how jaxnu's automatic differentiation maps the MSW resonance band inside the solar core
+Generates a focused, publication-quality single-panel figure showing how jaxnu's
+automatic differentiation maps the MSW resonance band inside the solar core
 (0.02 to 0.50 R_sun) across neutrino energies 0.1 - 30 MeV, annotated with
 key solar neutrino flux regimes (pp, 7Be, pep, 8B, hep).
 
@@ -22,10 +22,11 @@ import numpy as np
 import jax
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
+from scipy.interpolate import UnivariateSpline
 from scipy.ndimage import gaussian_filter
 
 import jaxnu
-from jaxnu import solar, nufit_no
+from jaxnu import solar, nufit_no, constants as C
 
 # Output directories
 BENCH_OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "output")
@@ -40,7 +41,7 @@ FIG_PNG = os.path.join(PAPER_FIGS, "fig_solar_autodiff.png")
 FIGONLY = os.environ.get("FIGONLY", "") not in ("", "0")
 
 if not FIGONLY or not os.path.exists(NPZ_FILE):
-    print("Computing high-statistics 2D solar core gradient map (400x350 grid)...", flush=True)
+    print("Computing 2D solar core gradient map with smooth C^2 profile (400x350 grid)...", flush=True)
     t0 = time.time()
 
     p = nufit_no()
@@ -50,20 +51,55 @@ if not FIGONLY or not os.path.exists(NPZ_FILE):
     else:
         prof = solar.exponential_profile()
 
+    # Use UnivariateSpline with mild smoothing to smooth out 4-digit rounding steps in bs05 table
+    spl = UnivariateSpline(prof.r_over_rsun, prof.rho_ye, s=1e-3, k=3)
+    r_knots_fine = np.linspace(0.0, 1.0, 500)
+    rho_ye_smooth = spl(r_knots_fine)
+
+    # Re-spline for exact C^2 evaluation
+    from scipy.interpolate import CubicSpline
+    cs = CubicSpline(r_knots_fine, rho_ye_smooth)
+    x_knots = jnp.asarray(cs.x)
+    c_coeffs = jnp.asarray(cs.c)
+
+    def jax_cubic_spline_eval(x):
+        idx = jnp.searchsorted(x_knots, x, side="right") - 1
+        idx = jnp.clip(idx, 0, len(x_knots) - 2)
+        dx = x - x_knots[idx]
+        return c_coeffs[0, idx] * dx**3 + c_coeffs[1, idx] * dx**2 + c_coeffs[2, idx] * dx + c_coeffs[3, idx]
+
     # High-resolution energy range: 400 log-spaced points from 0.1 to 30 MeV
     energies_2d = jnp.logspace(-1, 1.48, 400)
     # Physical core radius range: 0.02 to 0.50 R_sun (350 linear points)
     radii_ratio = jnp.linspace(0.02, 0.50, 350)
 
-    def pee_at_er(e_mev, r_ratio):
+    u = p.pmns()
+    msq = p.msquared()
+
+    def pee_smooth_er(e_mev, r_ratio):
         e_gev = e_mev * 1e-3
-        r_km = r_ratio * prof.R_sun_km
-        F = solar.adiabatic_mass_fractions(p, e_gev, prof, prof.R_sun_km, r_km, alpha=0)
-        U = p.pmns()
-        return jnp.sum(F * jnp.abs(U[0]) ** 2)
+        e_eV = e_gev * C.GEV_TO_EV
+
+        # Smooth C^2 density potential at production radius
+        rho_ye_emit = jax_cubic_spline_eval(r_ratio)
+        v_emit = C.matter_potential_eV(rho_ye_emit, 1.0)
+
+        h_emit = jaxnu.hamiltonian.matter_hamiltonian(u, msq, e_eV, v_emit)
+        _, vecs_emit = jnp.linalg.eigh(h_emit)
+        w = jnp.abs(vecs_emit[0, :]) ** 2
+
+        # Surface potential
+        rho_ye_surf = jax_cubic_spline_eval(1.0)
+        v_surf = C.matter_potential_eV(rho_ye_surf, 1.0)
+        h_surf = jaxnu.hamiltonian.matter_hamiltonian(u, msq, e_eV, v_surf)
+        _, vecs_surf = jnp.linalg.eigh(h_surf)
+
+        a = jnp.conj(u).T @ vecs_surf
+        F = (jnp.abs(a) ** 2) @ w
+        return jnp.sum(F * jnp.abs(u[0]) ** 2)
 
     def grad_r(e_mev, r_ratio):
-        return jax.grad(lambda r: pee_at_er(e_mev, r))(r_ratio)
+        return jax.grad(lambda r: pee_smooth_er(e_mev, r))(r_ratio)
 
     # Vectorized evaluation over 140,000 points
     g_2d_r = jax.vmap(lambda e: jax.vmap(lambda r: grad_r(e, r))(radii_ratio))(energies_2d)
@@ -111,9 +147,8 @@ pc = ax.pcolormesh(radii_ratio, energies_2d, abs_g, cmap=cmap, vmin=0.0, vmax=1.
 cbar = fig.colorbar(pc, ax=ax, orientation="vertical", pad=0.02, aspect=18)
 cbar.set_label(r"Core sensitivity $|\partial P_{ee} / \partial (r_{\mathrm{emit}} / R_\odot)|$", fontsize=10.5)
 
-# Smooth contours over high-density grid
-abs_g_smooth = gaussian_filter(abs_g, sigma=1.5)
-cs = ax.contour(radii_ratio, energies_2d, abs_g_smooth, levels=[0.2, 0.4, 0.7, 0.9, 1.1, 1.25], colors="black", linewidths=0.5, alpha=0.35)
+# Smooth contours
+cs = ax.contour(radii_ratio, energies_2d, abs_g, levels=[0.2, 0.4, 0.7, 0.9, 1.1, 1.25], colors="black", linewidths=0.5, alpha=0.35)
 
 ax.set_yscale("log")
 ax.set_ylim(0.1, 30.0)
