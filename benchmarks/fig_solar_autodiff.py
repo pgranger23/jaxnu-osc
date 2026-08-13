@@ -1,9 +1,9 @@
 """fig_solar_autodiff.py: Standalone 2D functional sensitivity map of the solar interior core
 |\partial P_{ee} / \partial (r_{\rm emit} / R_\odot)|.
 
-Generates a focused, publication-quality single-panel figure showing how jaxnu's
-automatic differentiation maps the MSW resonance band inside the solar core
-(0.0 to 0.55 R_sun) across neutrino energies 0.1 - 30 MeV, annotated with
+Generates a focused, high-statistics publication-quality single-panel figure showing
+how jaxnu's automatic differentiation maps the MSW resonance band inside the solar core
+(0.02 to 0.50 R_sun) across neutrino energies 0.1 - 30 MeV, annotated with
 key solar neutrino flux regimes (pp, 7Be, pep, 8B, hep).
 
 Run from repository root:
@@ -40,7 +40,7 @@ FIG_PNG = os.path.join(PAPER_FIGS, "fig_solar_autodiff.png")
 FIGONLY = os.environ.get("FIGONLY", "") not in ("", "0")
 
 if not FIGONLY or not os.path.exists(NPZ_FILE):
-    print("Computing 2D solar core gradient map...", flush=True)
+    print("Computing high-statistics 2D solar core gradient map (400x350 grid)...", flush=True)
     t0 = time.time()
 
     p = nufit_no()
@@ -50,10 +50,10 @@ if not FIGONLY or not os.path.exists(NPZ_FILE):
     else:
         prof = solar.exponential_profile()
 
-    # Extended energy range: 0.1 to 30 MeV
-    energies_2d = jnp.logspace(-1, 1.48, 160)  # 0.1 to 30.2 MeV
-    # Extended radius range: 0.0 to 0.55 R_sun
-    radii_ratio = jnp.linspace(0.0, 0.55, 150)  # r/R_sun
+    # High-resolution energy range: 400 log-spaced points from 0.1 to 30 MeV
+    energies_2d = jnp.logspace(-1, 1.48, 400)
+    # Physical core radius range: 0.02 to 0.50 R_sun (350 linear points)
+    radii_ratio = jnp.linspace(0.02, 0.50, 350)
 
     def pee_at_er(e_mev, r_ratio):
         e_gev = e_mev * 1e-3
@@ -65,6 +65,7 @@ if not FIGONLY or not os.path.exists(NPZ_FILE):
     def grad_r(e_mev, r_ratio):
         return jax.grad(lambda r: pee_at_er(e_mev, r))(r_ratio)
 
+    # Vectorized evaluation over 140,000 points
     g_2d_r = jax.vmap(lambda e: jax.vmap(lambda r: grad_r(e, r))(radii_ratio))(energies_2d)
     g_2d_r = np.array(g_2d_r)
 
@@ -103,46 +104,46 @@ fig.subplots_adjust(left=0.11, right=0.92, top=0.90, bottom=0.14)
 cmap = plt.cm.YlOrRd
 
 abs_g = np.abs(g_2d_r)
-# Mild spatial smoothing for clean contour lines
-abs_g_smooth = gaussian_filter(abs_g, sigma=0.9)
 
-pc = ax.pcolormesh(radii_ratio, energies_2d, abs_g, cmap=cmap, shading="gouraud")
+# High-resolution rendering
+pc = ax.pcolormesh(radii_ratio, energies_2d, abs_g, cmap=cmap, vmin=0.0, vmax=1.35, shading="gouraud")
 
 cbar = fig.colorbar(pc, ax=ax, orientation="vertical", pad=0.02, aspect=18)
 cbar.set_label(r"Core sensitivity $|\partial P_{ee} / \partial (r_{\mathrm{emit}} / R_\odot)|$", fontsize=10.5)
 
-# Overlay smooth contours
-cs = ax.contour(radii_ratio, energies_2d, abs_g_smooth, levels=[0.2, 0.5, 0.8, 1.1, 1.3], colors="black", linewidths=0.5, alpha=0.35)
+# Smooth contours over high-density grid
+abs_g_smooth = gaussian_filter(abs_g, sigma=1.5)
+cs = ax.contour(radii_ratio, energies_2d, abs_g_smooth, levels=[0.2, 0.4, 0.7, 0.9, 1.1, 1.25], colors="black", linewidths=0.5, alpha=0.35)
 
 ax.set_yscale("log")
 ax.set_ylim(0.1, 30.0)
-ax.set_xlim(0.0, 0.55)
+ax.set_xlim(0.02, 0.50)
 ax.set_xlabel(r"Solar Production Radius $r_{\mathrm{emit}} / R_\odot$", fontsize=11)
 ax.set_ylabel(r"Neutrino Energy $E$ [MeV]", fontsize=11)
 ax.grid(True, which="both", ls=":", lw=0.3, alpha=0.5, color="gray")
 
 # Annotations for key solar flux boundaries and components
 ax.axhline(0.42, color="#2ca02c", ls="--", lw=0.9, alpha=0.8)
-ax.text(0.53, 0.45, r"$pp$ end (0.42 MeV)", color="#2ca02c", fontsize=8.5, ha="right", fontweight="bold",
+ax.text(0.48, 0.45, r"$pp$ end (0.42 MeV)", color="#2ca02c", fontsize=8.5, ha="right", fontweight="bold",
         bbox=dict(boxstyle="round,pad=0.2", fc="white", ec="none", alpha=0.85))
 
 ax.axhline(0.86, color="#d62728", ls="--", lw=0.9, alpha=0.8)
-ax.text(0.53, 0.92, r"$^7\mathrm{Be}$ (0.86 MeV)", color="#d62728", fontsize=8.5, ha="right", fontweight="bold",
+ax.text(0.48, 0.92, r"$^7\mathrm{Be}$ (0.86 MeV)", color="#d62728", fontsize=8.5, ha="right", fontweight="bold",
         bbox=dict(boxstyle="round,pad=0.2", fc="white", ec="none", alpha=0.85))
 
 ax.axhline(1.44, color="#9467bd", ls="--", lw=0.9, alpha=0.8)
-ax.text(0.53, 1.52, r"$pep$ (1.44 MeV)", color="#9467bd", fontsize=8.5, ha="right", fontweight="bold",
+ax.text(0.48, 1.52, r"$pep$ (1.44 MeV)", color="#9467bd", fontsize=8.5, ha="right", fontweight="bold",
         bbox=dict(boxstyle="round,pad=0.2", fc="white", ec="none", alpha=0.85))
 
 ax.axhline(18.8, color="#8c564b", ls="--", lw=0.9, alpha=0.8)
-ax.text(0.53, 19.8, r"$hep$ end (18.8 MeV)", color="#8c564b", fontsize=8.5, ha="right", fontweight="bold",
+ax.text(0.48, 19.8, r"$hep$ end (18.8 MeV)", color="#8c564b", fontsize=8.5, ha="right", fontweight="bold",
         bbox=dict(boxstyle="round,pad=0.2", fc="white", ec="none", alpha=0.85))
 
 # Annotate MSW resonance band
 ax.annotate(
     "MSW Resonance Band\n(Peak core sensitivity)",
     xy=(0.17, 7.5),
-    xytext=(0.03, 13.5),
+    xytext=(0.04, 13.5),
     arrowprops=dict(arrowstyle="->", color="#b2182b", lw=1.3),
     fontsize=9,
     color="#b2182b",
