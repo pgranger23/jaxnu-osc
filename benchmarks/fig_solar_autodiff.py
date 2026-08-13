@@ -184,20 +184,19 @@ K_matrix = data["K_matrix"]
 # --- Plotting Clean 1x2 Side-by-Side Figure ---
 plt.rcParams.update(
     {
-        "font.size": 13,
-        "axes.titlesize": 14.5,
-        "axes.labelsize": 13.5,
-        "xtick.labelsize": 12,
-        "ytick.labelsize": 12,
-        "legend.fontsize": 10.5,
+        "font.size": 14,
+        "axes.titlesize": 15,
+        "axes.labelsize": 14,
+        "xtick.labelsize": 12.5,
+        "ytick.labelsize": 12.5,
+        "legend.fontsize": 11,
         "axes.linewidth": 1.2,
         "lines.linewidth": 2.0,
     }
 )
 
-fig, axes = plt.subplots(1, 2, figsize=(13.2, 5.0))
-# Expand wspace to 0.46 to completely eliminate label clash between right axis (a) and left axis (b)
-fig.subplots_adjust(left=0.07, right=0.93, top=0.91, bottom=0.14, wspace=0.46)
+fig, axes = plt.subplots(1, 2, figsize=(12.8, 5.2))
+fig.subplots_adjust(left=0.08, right=0.92, top=0.91, bottom=0.14, wspace=0.32)
 
 ax_sens = axes[0]
 ax_tomo = axes[1]
@@ -217,15 +216,15 @@ ax_sens.set_xscale("log")
 ax_sens.set_xlim(0.1, 30.0)
 ax_sens.set_xlabel(r"neutrino energy $E$ [MeV]")
 ax_sens.set_ylabel(r"sensitivities $\partial P/\partial\theta_{12}$, $|\partial P/\partial\ln N_0|$")
-ax_sens2.set_ylabel(r"sensitivity $\partial P/\partial\Delta m^2_{21}\ [10^3\,\text{eV}^{-2}]$", color="tab:red", labelpad=6)
+ax_sens2.set_ylabel(r"sensitivity $\partial P/\partial\Delta m^2_{21}\ [10^3\,\text{eV}^{-2}]$", color="tab:red")
 ax_sens2.tick_params(axis="y", labelcolor="tab:red")
 
 ax_sens.grid(True, which="both", ls=":", lw=0.4, alpha=0.6, color="gray")
 
-# Combine legends - Top left
+# Combine legends - Move to top left as requested
 lines = [line1, line2, line3]
 labels_leg = [l.get_label() for l in lines]
-ax_sens.legend(lines, labels_leg, loc="upper left", framealpha=0.9, fontsize=10)
+ax_sens.legend(lines, labels_leg, loc="upper left", framealpha=0.9, fontsize=10.5)
 
 ax_sens.set_title(r"(a) solar parameter sensitivities & FD benchmark", pad=10)
 
@@ -242,22 +241,22 @@ ax_tomo.set_yscale("log")
 ax_tomo.set_ylim(0.1, 30.0)
 ax_tomo.set_xlim(0.01, 0.35)
 ax_tomo.set_xlabel(r"solar radial position $r / R_\odot$")
-ax_tomo.set_ylabel(r"neutrino energy $E$ [MeV]", labelpad=4)
+ax_tomo.set_ylabel(r"neutrino energy $E$ [MeV]")
 ax_tomo.grid(True, which="both", ls=":", lw=0.4, alpha=0.6, color="gray")
 
 # Reference energy lines without text boxes/arrows
 ax_tomo.axhline(0.42, color="tab:green", ls="--", lw=1.0, alpha=0.8)
-ax_tomo.text(0.34, 0.45, r"$pp$ end", color="tab:green", fontsize=10, ha="right", fontweight="bold")
+ax_tomo.text(0.34, 0.45, r"$pp$ end", color="tab:green", fontsize=10.5, ha="right", fontweight="bold")
 
 ax_tomo.axhline(0.86, color="tab:red", ls="--", lw=1.0, alpha=0.8)
-ax_tomo.text(0.34, 0.92, r"$^7\mathrm{Be}$", color="tab:red", fontsize=10, ha="right", fontweight="bold")
+ax_tomo.text(0.34, 0.92, r"$^7\mathrm{Be}$", color="tab:red", fontsize=10.5, ha="right", fontweight="bold")
 
 ax_tomo.axhline(18.8, color="tab:brown", ls="--", lw=1.0, alpha=0.8)
-ax_tomo.text(0.34, 19.8, r"$hep$ end", color="tab:brown", fontsize=10, ha="right", fontweight="bold")
+ax_tomo.text(0.34, 19.8, r"$hep$ end", color="tab:brown", fontsize=10.5, ha="right", fontweight="bold")
 
 ax_tomo.set_title(r"(b) functional core tomography kernel via VJP", pad=10)
 
 # Save consolidated outputs
 fig.savefig(FIG_PDF, dpi=300, bbox_inches="tight")
 fig.savefig(FIG_PNG, dpi=300, bbox_inches="tight")
-print(f"Saved clean 1x2 side-by-side figure with no label clash to {FIG_PDF} and {FIG_PNG}")
+print(f"Saved clean 1x2 side-by-side square panel figure to {FIG_PDF} and {FIG_PNG}")
