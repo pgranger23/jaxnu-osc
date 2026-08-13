@@ -181,7 +181,7 @@ energies_2d = data["energies_2d"]
 r_grid = data["r_grid"]
 K_matrix = data["K_matrix"]
 
-# --- Plotting Standalone 1x2 Side-by-Side Figure ---
+# --- Plotting Clean 1x2 Side-by-Side Figure ---
 plt.rcParams.update(
     {
         "font.size": 14,
@@ -221,22 +221,11 @@ ax_sens2.tick_params(axis="y", labelcolor="tab:red")
 
 ax_sens.grid(True, which="both", ls=":", lw=0.4, alpha=0.6, color="gray")
 
-# Combine legends
+# Combine legends - Move to top left as requested
 lines = [line1, line2, line3]
 labels_leg = [l.get_label() for l in lines]
-ax_sens.legend(lines, labels_leg, loc="upper right", framealpha=0.9, fontsize=10.5)
+ax_sens.legend(lines, labels_leg, loc="upper left", framealpha=0.9, fontsize=10.5)
 
-# Annotate MSW resonance spike
-ax_sens.annotate(
-    "MSW resonance spike\n" + r"($E = 4.41\text{ MeV}$, $1.68\times 10^3\text{ eV}^{-2}$)",
-    xy=(4.41, 0.45),
-    xytext=(0.14, 0.38),
-    arrowprops=dict(arrowstyle="->", color="tab:red", lw=1.3),
-    fontsize=10.5,
-    color="tab:red",
-    fontweight="bold",
-    bbox=dict(boxstyle="round,pad=0.25", fc="#fbe8e8", ec="tab:red", lw=0.9),
-)
 ax_sens.set_title(r"(a) solar parameter sensitivities & FD benchmark", pad=10)
 
 # --- PANEL (b): 2D Functional Core Tomography Kernel ---
@@ -255,33 +244,19 @@ ax_tomo.set_xlabel(r"solar radial position $r / R_\odot$")
 ax_tomo.set_ylabel(r"neutrino energy $E$ [MeV]")
 ax_tomo.grid(True, which="both", ls=":", lw=0.4, alpha=0.6, color="gray")
 
-# Reference energy lines
+# Reference energy lines without text boxes/arrows
 ax_tomo.axhline(0.42, color="tab:green", ls="--", lw=1.0, alpha=0.8)
-ax_tomo.text(0.34, 0.45, r"$pp$ end", color="tab:green", fontsize=10.5, ha="right", fontweight="bold",
-             bbox=dict(boxstyle="round,pad=0.2", fc="white", ec="none", alpha=0.85))
+ax_tomo.text(0.34, 0.45, r"$pp$ end", color="tab:green", fontsize=10.5, ha="right", fontweight="bold")
 
 ax_tomo.axhline(0.86, color="tab:red", ls="--", lw=1.0, alpha=0.8)
-ax_tomo.text(0.34, 0.92, r"$^7\mathrm{Be}$", color="tab:red", fontsize=10.5, ha="right", fontweight="bold",
-             bbox=dict(boxstyle="round,pad=0.2", fc="white", ec="none", alpha=0.85))
+ax_tomo.text(0.34, 0.92, r"$^7\mathrm{Be}$", color="tab:red", fontsize=10.5, ha="right", fontweight="bold")
 
 ax_tomo.axhline(18.8, color="tab:brown", ls="--", lw=1.0, alpha=0.8)
-ax_tomo.text(0.34, 19.8, r"$hep$ end", color="tab:brown", fontsize=10.5, ha="right", fontweight="bold",
-             bbox=dict(boxstyle="round,pad=0.2", fc="white", ec="none", alpha=0.85))
-
-ax_tomo.annotate(
-    "functional core tomography window\n" + r"(80 radial shells in 1 VJP pass)",
-    xy=(0.05, 4.4),
-    xytext=(0.095, 2.2),
-    arrowprops=dict(arrowstyle="->", color="#08519c", lw=1.3),
-    fontsize=9.5,
-    color="#08519c",
-    fontweight="bold",
-    bbox=dict(boxstyle="round,pad=0.25", fc="#eff3ff", ec="#08519c", lw=0.9),
-)
+ax_tomo.text(0.34, 19.8, r"$hep$ end", color="tab:brown", fontsize=10.5, ha="right", fontweight="bold")
 
 ax_tomo.set_title(r"(b) functional core tomography kernel via VJP", pad=10)
 
 # Save consolidated outputs
 fig.savefig(FIG_PDF, dpi=300, bbox_inches="tight")
 fig.savefig(FIG_PNG, dpi=300, bbox_inches="tight")
-print(f"Saved 1x2 side-by-side square panel figure to {FIG_PDF} and {FIG_PNG}")
+print(f"Saved clean 1x2 side-by-side square panel figure to {FIG_PDF} and {FIG_PNG}")
