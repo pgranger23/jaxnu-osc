@@ -15,8 +15,8 @@ Also covers the new ``critical_cos_zenith`` diagnostic helper.  Style follows
 import jax
 import jax.numpy as jnp
 
-from jaxnu import earth as E
-from jaxnu import nufit_no, probability_earth, probability_profile, Flavor
+from mango import earth as E
+from mango import nufit_no, probability_earth, probability_profile, Flavor
 
 
 # --- BUG 1: cos(zenith) pole gradient ---------------------------------------

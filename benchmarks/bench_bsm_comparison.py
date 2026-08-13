@@ -26,9 +26,9 @@ import numpy as np
 import jax
 import jax.numpy as jnp
 
-import jaxnu
-from jaxnu import nufit_no, solar
-from jaxnu import constants as C
+import mango
+from mango import nufit_no, solar
+from mango import constants as C
 
 print("=" * 78)
 print("PART 1 -- reference codes actually available in this environment")

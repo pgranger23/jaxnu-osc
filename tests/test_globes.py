@@ -15,8 +15,8 @@ import numpy as np
 import jax
 import jax.numpy as jnp
 
-import jaxnu
-from jaxnu import OscParams, globes
+import mango
+from mango import OscParams, globes
 
 DUNE_GLB = Path(__file__).resolve().parents[1] / "analyses/dune/globes/DUNE_GLoBES.glb"
 

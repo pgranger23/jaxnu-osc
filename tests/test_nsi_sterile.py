@@ -6,8 +6,8 @@ import numpy as np
 import jax
 import jax.numpy as jnp
 
-import jaxnu
-from jaxnu import (OscParams, NSI, Sterile3plus1, NFlavorParams, pmns_nflavor,
+import mango
+from mango import (OscParams, NSI, Sterile3plus1, NFlavorParams, pmns_nflavor,
                    nufit_no, probability_constant, probability_vacuum,
                    probability_earth, Flavor)
 

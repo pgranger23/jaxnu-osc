@@ -3,7 +3,7 @@
 Uses the stable trigonometric solution of the characteristic cubic (eigenvalues
 of a Hermitian matrix are real).  Closed-form and differentiable, which makes it
 preferable to a generic ``eigh`` for the small matrices appearing in 3-flavor
-oscillations.  Only eigenvalues are produced; the :mod:`jaxnu.propagator`
+oscillations.  Only eigenvalues are produced; the :mod:`mango.propagator`
 ``cayley`` backend builds ``exp(-iHL)`` from them via Cayley-Hamilton, so no
 eigenvectors are required.
 

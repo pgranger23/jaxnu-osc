@@ -2,7 +2,7 @@
 
 Integrates ``dS/ds = -i H(s) S`` with an adaptive ODE solver.  This handles
 *arbitrary smooth* density profiles and serves as an independent cross-check of
-the piecewise-constant :mod:`jaxnu.layers` method.  Two backends:
+the piecewise-constant :mod:`mango.layers` method.  Two backends:
 
 * ``"odeint"`` (default) -- ``jax.experimental.ode.odeint`` (Dopri5); no extra
   dependency.
@@ -124,7 +124,7 @@ def earth_potential_fn(cz, ye=0.4957, det_depth_km=0.0):
     layered backend uses the per-region value -- the core's Y_e differs from
     the mantle's.  For a core-crossing chord the two therefore describe
     *different physics*, not one physics by two algorithms: comparing this
-    against :func:`jaxnu.probability_earth` at ``cz = -0.9`` disagrees by up to
+    against :func:`mango.probability_earth` at ``cz = -0.9`` disagrees by up to
     ~2e-1, against ~2e-4 once both are given the same ``ye``.  Pass the matching
     ``ye`` (or restrict to mantle-only chords) before reading any such
     comparison as a solver-accuracy statement.  Quantified in

@@ -1,6 +1,6 @@
 """TDR-style DUNE spectra straight from the generic GLoBES loader.
 
-Loads the official DUNE GLoBES configuration with ``jaxnu.globes.load`` and plots
+Loads the official DUNE GLoBES configuration with ``mango.globes.load`` and plots
 the nu_e / nu_e-bar appearance spectra for delta_CP = -pi/2, 0, +pi/2 (the classic
 DUNE figure showing the CP-phase dependence), with the summed backgrounds shaded.
 Everything downstream of the file parse is differentiable.
@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import jax.numpy as jnp
 
-from jaxnu import OscParams, globes
+from mango import OscParams, globes
 
 GLB = Path(__file__).resolve().parents[1] / "analyses/dune/globes/DUNE_GLoBES.glb"
 exp = globes.load(GLB, scale=1.21)
@@ -61,7 +61,7 @@ for ax, rule in zip(axs, ["nue_app", "nuebar_app"]):
     ax.set_ylabel("Events / 0.25 GeV")
     ax.set_title(titles[rule])
     ax.legend(fontsize=9)
-fig.suptitle("DUNE TDR spectra from jaxnu.globes.load (official GLoBES config, "
+fig.suptitle("DUNE TDR spectra from mango.globes.load (official GLoBES config, "
              "6.5 yr/mode, NO)", fontsize=12)
 fig.tight_layout()
 out = Path(__file__).resolve().parent / "dune_globes.jpg"

@@ -30,9 +30,9 @@ python examples/nuwaves/adiabatic_sun_ssm.py  # solar adiabatic MSW
   `earth.chord_segments`) — full `cos θ_z ∈ [-1, 1]` including down-going /
   near-horizon vacuum baselines, from the single unified Earth entrypoint.
 - **Generic N-flavor core** — `vacuum_2flavors.py` builds a 2-flavor (sterile)
-  system directly from `jaxnu.pmns` / `hamiltonian` / `propagator`.
+  system directly from `mango.pmns` / `hamiltonian` / `propagator`.
 - **Energy smearing** — Gauss-Hermite quadrature over a Gaussian energy resolution.
-- **Solar adiabatic MSW** (`jaxnu.solar`) — BS05 SSM profile loader + averaged
+- **Solar adiabatic MSW** (`mango.solar`) — BS05 SSM profile loader + averaged
   adiabatic vacuum mass-state fractions.
 
 ## Note on the solar plot

@@ -1,4 +1,4 @@
-"""DUNE long-baseline oscillation analysis with jaxnu.
+"""DUNE long-baseline oscillation analysis with mango.
 
 Reproduces the DUNE TDR GLoBES configuration (arXiv:2103.04797): the far-detector
 event spectra and the CP-violation / mass-ordering sensitivities, using jaxnu for
@@ -12,7 +12,7 @@ The forward model per reconstructed bin i and channel c:
 
 summed over channels within each rule (nu_e app, nu_e-bar app, nu_mu dis,
 nu_mu-bar dis). Only the oscillation probabilities P_c depend on the physics
-parameters, and they come from jaxnu -> the whole spectrum is differentiable.
+parameters, and they come from mango -> the whole spectrum is differentiable.
 """
 
 from __future__ import annotations
@@ -26,8 +26,8 @@ import jax
 import jax.numpy as jnp
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-import jaxnu
-from jaxnu import OscParams
+import mango
+from mango import OscParams
 
 HERE = Path(__file__).resolve().parent
 G = HERE / "globes"
@@ -167,7 +167,7 @@ class DuneData:
     def _precompute(self):
         # For every channel precompute the energy-independent kernel
         #   K_c[i,j] = post_eff_c[i] * R_c[i,j] * flux_c[j] * xsec_c[j] * NORM * samp_w[j]
-        # so that N_c[i] = sum_j K_c[i,j] * P_c[j]  (P from jaxnu).
+        # so that N_c[i] = sum_j K_c[i,j] * P_c[j]  (P from mango).
         self.kernels, self.meta = {}, {}
         for rule, chans in self.rules.items():
             Ks, ms = [], []
@@ -185,11 +185,11 @@ class DuneData:
 # --- oscillation + spectra (jaxnu) ---------------------------------------
 
 def _osc_probs(params, rho=RHO):
-    """P[out,in] for nu and nubar at the sampling energies, from jaxnu."""
+    """P[out,in] for nu and nubar at the sampling energies, from mango."""
     data = _DATA
     E = jnp.asarray(data.samp_c)
-    Pn = jaxnu.probability_constant(params, E, L_KM, density=rho, ye=0.5, backend="eigh")
-    Pb = jaxnu.probability_constant(params, E, L_KM, density=rho, ye=0.5, anti=True, backend="eigh")
+    Pn = mango.probability_constant(params, E, L_KM, density=rho, ye=0.5, backend="eigh")
+    Pb = mango.probability_constant(params, E, L_KM, density=rho, ye=0.5, anti=True, backend="eigh")
     return Pn, Pb
 
 

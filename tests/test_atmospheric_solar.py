@@ -5,8 +5,8 @@ import os
 import numpy as np
 import jax.numpy as jnp
 
-import jaxnu
-from jaxnu import (nufit_no, probability_earth, probability_vacuum,
+import mango
+from mango import (nufit_no, probability_earth, probability_vacuum,
                    Flavor, earth, solar)
 
 
@@ -62,7 +62,7 @@ def test_ye_core_differentiable_and_geometrically_localized():
 def test_layered_earth_matches_prem_and_is_differentiable():
     import dataclasses
     import jax
-    from jaxnu import prem_layered
+    from mango import prem_layered
     p = nufit_no()
     model = prem_layered(n_sub=3)
     # sanity: constant-shell layered model ~ PREM-polynomial path
@@ -106,7 +106,7 @@ def test_solar_adiabatic_matches_closed_form_two_flavour():
 
     The reference is an independently written textbook two-flavour adiabatic
     MSW formula with theta13 folded in by projecting out nu_3. It is a
-    genuinely different computational route from jaxnu's N x N instantaneous
+    genuinely different computational route from mango's N x N instantaneous
     eigenvector projection, so agreement is a real cross-check.
 
     The residual is dominated by the *reference's* truncation, not ours: the

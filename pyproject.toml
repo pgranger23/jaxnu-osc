@@ -3,9 +3,9 @@ requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "jaxnu"
+name = "mango-osc"
 version = "0.2.4"
-description = "Differentiable neutrino oscillation calculator in JAX (vacuum, constant density, PREM Earth, atmospheric, solar, NSI, sterile)"
+description = "MANGO: A Neutrino Gradient Oscillator in JAX (vacuum, constant density, PREM Earth, atmospheric, solar, NSI, sterile)"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
@@ -29,12 +29,12 @@ examples = ["matplotlib>=3.6", "blackjax>=1.0"]  # blackjax: HMC example
 diffrax = ["diffrax>=0.5"]  # optional continuous-density ODE backend
 
 [project.urls]
-Homepage = "https://github.com/pgranger23/jaxnu-osc"
-Repository = "https://github.com/pgranger23/jaxnu-osc"
-Issues = "https://github.com/pgranger23/jaxnu-osc/issues"
+Homepage = "https://github.com/pgranger23/mango-osc"
+Repository = "https://github.com/pgranger23/mango-osc"
+Issues = "https://github.com/pgranger23/mango-osc/issues"
 
 [tool.setuptools.packages.find]
-include = ["jaxnu*"]
+include = ["mango*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

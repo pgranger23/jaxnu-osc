@@ -4,8 +4,8 @@ import numpy as np
 import jax
 import jax.numpy as jnp
 
-import jaxnu
-from jaxnu import (nufit_no, probability_constant, decoherence, nonunitarity,
+import mango
+from mango import (nufit_no, probability_constant, decoherence, nonunitarity,
                    Decoherence, WavePacket, NonUnitarity, Flavor)
 
 P = nufit_no()
@@ -21,8 +21,8 @@ def test_decoherence_zero_gamma_is_standard():
 
 
 def test_decoherence_full_damping_is_averaged():
-    from jaxnu.hamiltonian import matter_hamiltonian
-    from jaxnu import constants as C
+    from mango.hamiltonian import matter_hamiltonian
+    from mango import constants as C
     d = Decoherence(gamma21=1e-10, gamma31=1e-10, gamma32=1e-10)
     Pd = decoherence.probability(P, jnp.asarray(2.0), 1300.0, d, density=2.8)
     h = matter_hamiltonian(P.pmns(), P.msquared(), 2.0 * C.GEV_TO_EV,

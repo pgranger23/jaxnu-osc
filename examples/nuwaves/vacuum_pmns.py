@@ -6,16 +6,16 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from _common import nuwaves_params, FIGDIR
-import jaxnu
-from jaxnu import probability_vacuum, Flavor
+import mango
+from mango import probability_vacuum, Flavor
 
 p = nuwaves_params("NO")
 E = np.linspace(0.2, 3.0, 400)
 P = probability_vacuum(p, E, baseline_km=295.0)  # (nE, 3, 3) [out, in]
 
-Pme = np.array(jaxnu.select(P, Flavor.MU, Flavor.E))
-Pmm = np.array(jaxnu.select(P, Flavor.MU, Flavor.MU))
-Pmt = np.array(jaxnu.select(P, Flavor.MU, Flavor.TAU))
+Pme = np.array(mango.select(P, Flavor.MU, Flavor.E))
+Pmm = np.array(mango.select(P, Flavor.MU, Flavor.MU))
+Pmt = np.array(mango.select(P, Flavor.MU, Flavor.TAU))
 
 plt.figure(figsize=(6.5, 4.0), dpi=150)
 plt.plot(E, Pme, label=r"$P_{\mu e}$ appearance", lw=2)

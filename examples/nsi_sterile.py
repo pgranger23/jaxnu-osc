@@ -18,8 +18,8 @@ import numpy as np
 import jax
 import jax.numpy as jnp
 
-import jaxnu
-from jaxnu import (OscParams, Sterile3plus1, NSI, probability_vacuum,
+import mango
+from mango import (OscParams, Sterile3plus1, NSI, probability_vacuum,
                    probability_constant, Flavor)
 
 ang = dict(theta12=np.deg2rad(33.4), theta13=np.deg2rad(8.6),

@@ -1,5 +1,5 @@
 """jaxnu code paper, benchmark set 2 (addendum to bench_timing_and_gradients.py):
-  (a) NuFast-port timing standalone (uses jaxnu.nufast.prob_matrix directly)
+  (a) NuFast-port timing standalone (uses mango.nufast.prob_matrix directly)
   (b) same timing rows, meant to be run once on CPU and once on GPU so the
       paper's timing table is not GPU-only
   (c) AD-vs-central-difference validation of all three derivative classes:
@@ -47,8 +47,8 @@ def timeit(fn, *a, n=20):
 
 if MODE == "prec":
     # must run BEFORE heavy work; jaxnu turns x64 on at import, we turn it back off
-    import jaxnu
-    from jaxnu import nufit_no, probability_earth
+    import mango
+    from mango import nufit_no, probability_earth
     P64 = nufit_no()
     NE = 400
     E = jnp.linspace(1.0, 20.0, NE)
@@ -70,11 +70,11 @@ if MODE == "prec":
     print("ALL STEPS DONE")
     sys.exit()
 
-import jaxnu
-import jaxnu.oscillator as _osc
-from jaxnu import nufit_no, probability_constant, probability_earth
-from jaxnu import constants as C
-from jaxnu import nufast as NF
+import mango
+import mango.oscillator as _osc
+from mango import nufit_no, probability_constant, probability_earth
+from mango import constants as C
+from mango import nufast as NF
 import dataclasses
 
 P = nufit_no()
@@ -215,7 +215,7 @@ elif MODE == "degen":
     # as a comment in jaxnu/propagator.py and could not be re-run, so it is a
     # benchmark now. scipy is imported here and nowhere else in the package.
     import scipy.linalg as _sla
-    from jaxnu.propagator import propagator
+    from mango.propagator import propagator
 
     rng = np.random.default_rng(20260804)
     N_TRIAL = 500

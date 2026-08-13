@@ -11,8 +11,8 @@ authors:
     given-names: Pierre
     affiliation: "CERN"
     orcid: "https://orcid.org/0000-0002-8333-4393"
-repository-code: "https://github.com/pgranger23/jaxnu-osc"
-url: "https://github.com/pgranger23/jaxnu-osc"
+repository-code: "https://github.com/pgranger23/mango-osc"
+url: "https://github.com/pgranger23/mango-osc"
 license: MIT
 keywords:
   - neutrino oscillations

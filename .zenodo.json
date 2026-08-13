@@ -23,7 +23,7 @@
   "description": "<p>jaxnu is a neutrino oscillation calculator written in JAX, differentiable end-to-end with respect to every input &mdash; not only the oscillation parameters, but the propagation geometry and the matter densities of individual Earth shells, neither of which appears as a parameter of an analytic probability formula.</p><p>It covers vacuum, constant-density, layered-PREM, arbitrary-profile and adiabatic solar propagation, together with non-standard interactions, 3+N sterile states, decoherence and non-unitary mixing, through four cross-checked unitary backends and an adaptive ODE integrator. Because the gradient does not stop at the probability, it composes downstream through detector response, event weighting and binning into a likelihood or Fisher information.</p><p>This release is the version from which the numbers in the accompanying paper are computed.</p>",
   "related_identifiers": [
     {
-      "identifier": "https://github.com/pgranger23/jaxnu-osc",
+      "identifier": "https://github.com/pgranger23/mango-osc",
       "relation": "isSupplementTo",
       "scheme": "url"
     }

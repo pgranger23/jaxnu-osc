@@ -3,8 +3,8 @@
 import jax.numpy as jnp
 import numpy as np
 
-import jaxnu
-from jaxnu import (
+import mango
+from mango import (
     OscParams,
     Flavor,
     nufit_no,
@@ -14,7 +14,7 @@ from jaxnu import (
     earth,
 )
 
-R_E = jaxnu.constants.R_EARTH_KM
+R_E = mango.constants.R_EARTH_KM
 
 
 def _two_flavor_params(dm31=2.5e-3):

@@ -15,7 +15,7 @@ import numpy as np
 import jax
 
 from _common import nuwaves_params, FIGDIR
-from jaxnu import probability_earth, Flavor, nufit_no
+from mango import probability_earth, Flavor, nufit_no
 
 # Two parameter sets, two purposes:
 #   PARAMS=nuwaves (default) -- the nu-waves example values, so that the

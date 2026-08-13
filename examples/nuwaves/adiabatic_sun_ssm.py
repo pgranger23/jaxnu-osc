@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from _common import nuwaves_params, FIGDIR, DATADIR
-from jaxnu import solar
+from mango import solar
 
 p = nuwaves_params("NO")
 prof = solar.load_bs05(str(DATADIR / "bs05_agsop.dat"))

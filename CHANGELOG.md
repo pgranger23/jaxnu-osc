@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
-- **`jaxnu.__version__` was never bumped past 0.2.2**, so a clone of the v0.2.3
+- **`mango.__version__` was never bumped past 0.2.2**, so a clone of the v0.2.3
   tag reported the wrong version. It now tracks `pyproject.toml`.
 
 ### Added
@@ -47,7 +47,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
-- **`jaxnu.stat` terminology.** `1/sqrt(F_ii)` was described as the
+- **`mango.stat` terminology.** `1/sqrt(F_ii)` was described as the
   "profiled-out" bound. Profiling means minimizing over the other parameters
   and in the Gaussian limit coincides with *marginalizing*, i.e.
   `sqrt(inv(F)_ii)`. The fixed-others number is never the profiled result.
@@ -78,11 +78,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [0.2.1] - 2026-07-28
 
 Review-round correctness fixes, applied on top of the v0.2.0 feature
-release (decoherence, non-unitarity, GLoBES loader, `jaxnu.stat`).
+release (decoherence, non-unitarity, GLoBES loader, `mango.stat`).
 
 ### Added
 
-- **`jaxnu.earth.critical_cos_zenith()`** — returns the `cos θ_z` values at
+- **`mango.earth.critical_cos_zenith()`** — returns the `cos θ_z` values at
   which the neutrino chord grazes a PREM shell boundary. At those angles the
   entering shell contributes a length `~ sqrt(r_b² - r_min²)`, a genuine
   sqrt-cusp, so `dP/d cos θ_z` diverges like `1/sqrt(|Δ|)`: measured ~1.6e3 at
@@ -145,7 +145,7 @@ release (decoherence, non-unitarity, GLoBES loader, `jaxnu.stat`).
   `theta23 = 49.1 deg`, `deltacp = 197 deg`). Only the docstring changed; the
   returned parameters are unchanged.
 - **`nsi=` accepted non-Hermitian matrices.** Passing a raw matter-NSI matrix
-  (as opposed to a `jaxnu.nsi.NSI(...)` instance, which builds a Hermitian
+  (as opposed to a `mango.nsi.NSI(...)` instance, which builds a Hermitian
   matrix by construction) with `eps_{alpha,beta} != conj(eps_{beta,alpha})`
   used to be accepted silently, which breaks unitarity of the propagated
   amplitude (injects unphysical gain/loss into some channels). A
@@ -160,7 +160,7 @@ release (decoherence, non-unitarity, GLoBES loader, `jaxnu.stat`).
   argument and the expected units/range, when the value is concrete;
   as before, no check can run on a value being traced under `jit`/`vmap`/
   `grad`, so those code paths are unaffected and unchanged in behavior.
-- **`jaxnu.solar.adiabatic_mass_fractions` raised on a scalar `r_km`.**
+- **`mango.solar.adiabatic_mass_fractions` raised on a scalar `r_km`.**
   Passing a single (scalar) radius, as shown in `README.md`'s solar
   snippet, used to raise a `vmap` rank error because the function assumed
   an array input internally. Scalar `r_km` is now accepted directly and

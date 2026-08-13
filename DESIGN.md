@@ -114,13 +114,13 @@ support is experimental). *Implemented.*
 ## 8. Public API
 
 ```python
-import jaxnu
+import mango
 
-params = jaxnu.OscParams(theta12, theta13, theta23, deltacp, dm21, dm31)
+params = mango.OscParams(theta12, theta13, theta23, deltacp, dm21, dm31)
 
 # vacuum / constant / earth, all batched + differentiable
-P = jaxnu.prob_earth(params, energy_GeV, cos_zenith, flavor_in, flavor_out)
-g = jax.grad(lambda p: jaxnu.prob_earth(p, E, cz, MU, E_).sum())(params)
+P = mango.prob_earth(params, energy_GeV, cos_zenith, flavor_in, flavor_out)
+g = jax.grad(lambda p: mango.prob_earth(p, E, cz, MU, E_).sum())(params)
 ```
 
 ## 9. Validation
@@ -146,7 +146,7 @@ reached parity with NuFast's C++; the Earth path did not, and a cost decompositi
 showed the CPU gap is XLA per-op overhead on the sequential scan of tiny 3×3 ops —
 not algorithmic — so restructuring buys ≤1.15× on CPU. NuFast-Earth's optimizations
 (eigensystem caching across `cosθz`; reduced-basis **real** per-shell amplitudes
-factoring θ₂₃/δ out — reuses the Rosetta code in `jaxnu.nufast`; symmetric-trajectory
+factoring θ₂₃/δ out — reuses the Rosetta code in `mango.nufast`; symmetric-trajectory
 halving; path-mean density) compound with the existing `vmap` structure and amortize
 the overhead **on GPU/TPU**. Trigger: a GPU target. Start with the reduced-basis
 real amplitude (highest flop saving, reuses existing code). Until then: for fast CPU

@@ -2,7 +2,7 @@
 
 OscProb (https://github.com/joaoabcoelho/OscProb), the widely used ROOT/Eigen
 oscillation library, was compiled and run with parameters matching
-``jaxnu.nufit_no()``.  Note OscProb conventions: ``SetMix(th12, th23, th13, dcp)``
+``mango.nufit_no()``.  Note OscProb conventions: ``SetMix(th12, th23, th13, dcp)``
 and ``SetDeltaMsqrs(dm21, dm32)`` with ``dm32 = dm31 - dm21``.
 
 * **Constant density** (``PMNS_Fast``, ``L = 1300 km``, ``rho = 2.85``,
@@ -21,7 +21,7 @@ import os
 import jax.numpy as jnp
 import numpy as np
 
-from jaxnu import nufit_no, probability_constant, probability_profile
+from mango import nufit_no, probability_constant, probability_profile
 
 P = nufit_no()
 

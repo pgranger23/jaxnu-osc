@@ -1,4 +1,4 @@
-"""Tests for layered/Earth non-unitary mixing (jaxnu.nonunitarity.{probability_profile,
+"""Tests for layered/Earth non-unitary mixing (mango.nonunitarity.{probability_profile,
 probability_earth}).
 
 Covers the deliverables of the layered non-unitarity extension:
@@ -20,8 +20,8 @@ import numpy as np
 import jax
 import jax.numpy as jnp
 
-from jaxnu import nufit_no, Flavor, nonunitarity, oscillator as osc, earth as _earth, prem_layered
-from jaxnu.nonunitarity import NonUnitarity
+from mango import nufit_no, Flavor, nonunitarity, oscillator as osc, earth as _earth, prem_layered
+from mango.nonunitarity import NonUnitarity
 
 P = nufit_no()
 E = jnp.linspace(0.5, 8.0, 15)

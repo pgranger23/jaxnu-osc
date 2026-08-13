@@ -23,8 +23,8 @@ import jax
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 
-import jaxnu
-from jaxnu import solar, nufit_no, constants as C
+import mango
+from mango import solar, nufit_no, constants as C
 
 # Output directories
 BENCH_OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "output")

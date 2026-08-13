@@ -1,10 +1,10 @@
-"""Tests for jaxnu.stat (Fisher information utilities)."""
+"""Tests for mango.stat (Fisher information utilities)."""
 
 import numpy as np
 import jax.numpy as jnp
 
-import jaxnu
-from jaxnu import nufit_no, probability_constant, stat, Flavor
+import mango
+from mango import nufit_no, probability_constant, stat, Flavor
 
 
 def test_fisher_counting_toy_analytic():

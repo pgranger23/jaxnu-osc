@@ -13,7 +13,7 @@ import jax
 import jax.numpy as jnp
 import pytest
 
-from jaxnu import (nufit_no, probability_constant, probability_vacuum,
+from mango import (nufit_no, probability_constant, probability_vacuum,
                    probability_earth)
 
 BACKENDS = ("nufast", "cayley", "eigh", "expm")
@@ -151,7 +151,7 @@ def test_baseline_gradient_agrees_in_both_ad_modes():
     """jax.grad disagreeing with jacfwd is the signature of a where-NaN trap:
     the outer where hides a divergent sqrt'(0) forwards but reverse mode still
     pulls the NaN back through the unselected branch."""
-    from jaxnu import earth as E
+    from mango import earth as E
 
     L = lambda cz: E.baseline_km(cz, det_depth_km=1.9)
     for cz in (-1.0, -0.5, 0.0, 1.0):

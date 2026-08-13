@@ -2,7 +2,7 @@
 classes the paper claims are cheap through the layered PREM Earth --
 (1) oscillation parameters, (2) geometry (cos(zenith), atmospheric production
 height, detector depth), (3) matter (per-shell density / electron fraction /
-boundary radius of a :class:`jaxnu.earth.LayeredEarth`).
+boundary radius of a :class:`mango.earth.LayeredEarth`).
 
 Follows the methodology of ``bench_timing_and_gradients.py`` exactly: each
 function is ``jax.jit``-compiled and warmed up (one call + ``block_until_ready``)
@@ -31,8 +31,8 @@ Standalone: only imports jaxnu / numpy / jax. Writes raw numbers to
 ./benchmarks/output/jaxnu_bench_derivative_classes.json.
 
 Run from the repo root:
-    JAX_PLATFORMS=cpu PYTHONPATH=external/jaxnu-osc .venv/bin/python \\
-        external/jaxnu-osc/benchmarks/bench_derivative_classes.py
+    JAX_PLATFORMS=cpu PYTHONPATH=external/mango-osc .venv/bin/python \\
+        external/mango-osc/benchmarks/bench_derivative_classes.py
 """
 import dataclasses
 import json
@@ -43,9 +43,9 @@ import numpy as np
 import jax
 import jax.numpy as jnp
 
-import jaxnu
-import jaxnu.earth as earth
-from jaxnu import nufit_no, probability_earth
+import mango
+import mango.earth as earth
+from mango import nufit_no, probability_earth
 
 OUTDIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "output")
 os.makedirs(OUTDIR, exist_ok=True)

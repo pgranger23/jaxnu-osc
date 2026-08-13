@@ -12,7 +12,7 @@ import jax
 import jax.numpy as jnp
 
 from _common import FIGDIR
-from jaxnu import pmns, hamiltonian, propagator, constants as C
+from mango import pmns, hamiltonian, propagator, constants as C
 
 # 2-flavor mixing (electron <-> sterile)
 sin2_2theta = 0.2

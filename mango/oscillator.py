@@ -139,7 +139,7 @@ def _nsi_matrix(nsi, n_active):
     """Coerce an NSI spec (NSI object or matrix) to an ``(n_active, n_active)``
     array, or ``None``.
 
-    The :class:`jaxnu.nsi.NSI` dataclass path always builds a Hermitian matrix by
+    The :class:`mango.nsi.NSI` dataclass path always builds a Hermitian matrix by
     construction. A raw matrix has no such guarantee, so it is checked here: a
     non-Hermitian matter-NSI matrix breaks the unitarity of the propagated
     amplitude (it silently injects non-physical gain/loss), so it is rejected
@@ -163,7 +163,7 @@ def _nsi_matrix(nsi, n_active):
                 "raw nsi= matrix must be Hermitian (eps_{alpha,beta} == "
                 "conj(eps_{beta,alpha})); a non-Hermitian matter potential "
                 "breaks unitarity of the propagated amplitude. Pass a "
-                "jaxnu.nsi.NSI(...) instance instead if you want this "
+                "mango.nsi.NSI(...) instance instead if you want this "
                 "enforced by construction."
             )
     return jnp.asarray(nsi, dtype=jnp.complex128)
@@ -178,11 +178,11 @@ def probability_constant(params, energy_GeV, baseline_km, density=0.0, ye=0.5,
 
     ``energy_GeV`` may be a scalar or 1-D array (vectorized).  ``baseline_km``,
     ``density`` and ``ye`` are scalars.  Set ``density=0`` for vacuum.  ``nsi`` is
-    an optional :class:`jaxnu.nsi.NSI` (or matrix) for non-standard interactions;
-    ``params`` may carry sterile flavors (see :mod:`jaxnu.sterile`).
+    an optional :class:`mango.nsi.NSI` (or matrix) for non-standard interactions;
+    ``params`` may carry sterile flavors (see :mod:`mango.sterile`).
 
     ``backend="nufast"`` (default) uses the fast analytic NuFast formula
-    (:mod:`jaxnu.nufast`) for standard 3-flavor; it transparently falls back to a
+    (:mod:`mango.nufast`) for standard 3-flavor; it transparently falls back to a
     matrix-exponential backend (``"cayley"`` for 3-flavor, ``"eigh"`` for N!=3)
     when NSI or steriles are present.  Returns a ``(..., N, N)`` matrix, or a
     scalar/1-D array if both ``flavor_in`` and ``flavor_out`` are given.
@@ -305,7 +305,7 @@ def probability_earth(params, energy_GeV, cos_zenith, det_depth_km=0.0,
     the detector depth below the surface.  ``nsi`` and sterile ``params`` are
     supported (sterile flavors feel the relative NC potential).
 
-    Pass ``earth_model`` (a :class:`jaxnu.earth.LayeredEarth`) to use a fully
+    Pass ``earth_model`` (a :class:`mango.earth.LayeredEarth`) to use a fully
     parametric constant-density-shell Earth instead of the fixed PREM polynomials;
     probabilities are then differentiable w.r.t. the **shell boundary radii**,
     **densities** and **Y_e** (it overrides ``n_sub`` / ``ye_core`` / ``ye_mantle``).

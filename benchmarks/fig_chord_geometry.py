@@ -8,7 +8,7 @@ geometry-derivative figure, the core-crossing threshold in the tomography
 example, and the shell-grazing cusps in the limitations), so it is worth
 drawing once.
 
-The shells and their densities are the ACTUAL ``jaxnu.earth.shell_table(4)``
+The shells and their densities are the ACTUAL ``mango.earth.shell_table(4)``
 used elsewhere in the paper (43 shells), not a three-zone cartoon: the point
 that the propagation is an ordered product over many constant-density segments
 is easier to see than to assert. The chord is coloured segment by segment with
@@ -42,7 +42,7 @@ HALO_THIN = [pe.withStroke(linewidth=2.6, foreground="white")]
 MARKER = dict(marker="o", color="0.08", markeredgecolor="white",
               markeredgewidth=1.3, linestyle="none")
 
-import jaxnu.earth as earth
+import mango.earth as earth
 
 OUTDIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "output")
 os.makedirs(OUTDIR, exist_ok=True)

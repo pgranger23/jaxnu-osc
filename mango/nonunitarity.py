@@ -30,10 +30,10 @@ object. A stack of constant-density segments is handled by building the
 *mass-basis* Hamiltonian ``H_mass,k = diag(0, dm21, dm31)/2E + N^dag V_flavor,k
 N`` for each segment ``k`` (own ``V_CC,k``/``V_NC,k``), chaining the ordinary
 unitary sub-propagators ``S_mass = S_mass,N ... S_mass,1`` exactly as
-:func:`jaxnu.layers.propagate_layers` does for the standard case, and only then
+:func:`mango.layers.propagate_layers` does for the standard case, and only then
 sandwiching the *total* chain with ``N ... N^dag``. Geometry/segments come from
-:mod:`jaxnu.earth` (:func:`jaxnu.earth.chord_segments` /
-:func:`jaxnu.earth.layered_chord_segments`), unchanged.
+:mod:`mango.earth` (:func:`mango.earth.chord_segments` /
+:func:`mango.earth.layered_chord_segments`), unchanged.
 
 Non-unitarity means probability need not be conserved column-by-column
 (``sum_b P(a->b) != 1`` in general -- genuine unitarity-violation leakage into
@@ -130,7 +130,7 @@ def probability(params, nu, energy_GeV, baseline_km, density=0.0, ye=0.5,
 #
 # N is applied once at the vertices, never per-layer: the per-segment object is
 # the ordinary unitary mass-basis propagator S_mass,k, chained exactly as
-# jaxnu.layers.propagate_layers chains flavor-basis propagators, and only the
+# mango.layers.propagate_layers chains flavor-basis propagators, and only the
 # *total* chain gets sandwiched by N ... N^dag. See the module docstring.
 
 
@@ -156,11 +156,11 @@ def _propagate_mass_layers(msq, energy_eV, A, B, v_cc_eV, v_nc_eV, length_invEV,
                            backend="cayley", parallel=None):
     """Chain the mass-basis evolution operator through constant-density segments.
 
-    Mirrors :func:`jaxnu.layers.propagate_layers`'s two product strategies
+    Mirrors :func:`mango.layers.propagate_layers`'s two product strategies
     (sequential ``lax.scan`` on CPU, ``vmap`` + ``lax.associative_scan`` on
     GPU/TPU) applied to the mass-basis Hamiltonian ``H_mass,k = diag(msq/2E) +
     v_cc,k * A - v_nc,k * B`` instead of the flavor-basis
-    :func:`jaxnu.hamiltonian.matter_hamiltonian` -- ``A``/``B`` are the
+    :func:`mango.hamiltonian.matter_hamiltonian` -- ``A``/``B`` are the
     precomputed pieces from :func:`_mass_matter_pieces`. ``v_cc_eV``/``v_nc_eV``/
     ``length_invEV`` are per-segment arrays ordered source -> detector (segment 0
     applied first). Returns the ``(3, 3)`` mass-basis evolution operator
@@ -206,7 +206,7 @@ def probability_profile(params, nu, energy_GeV, density_gcc, ye, length_km,
                         anti=False, backend="cayley", parallel=None,
                         flavor_in=None, flavor_out=None):
     """Non-unitary probabilities through a user-supplied piecewise-constant
-    profile (cf. :func:`jaxnu.oscillator.probability_profile`).
+    profile (cf. :func:`mango.oscillator.probability_profile`).
 
     ``density_gcc``, ``ye``, ``length_km`` are 1-D arrays (one entry per
     segment, ordered source -> detector); ``energy_GeV`` a scalar or 1-D array.
@@ -243,11 +243,11 @@ def probability_earth(params, nu, energy_GeV, cos_zenith, det_depth_km=0.0,
                       anti=False, backend="cayley", parallel=None,
                       flavor_in=None, flavor_out=None):
     """Non-unitary oscillation probabilities through the PREM Earth (and
-    atmosphere); cf. :func:`jaxnu.oscillator.probability_earth`.
+    atmosphere); cf. :func:`mango.oscillator.probability_earth`.
 
-    Reuses :func:`jaxnu.earth.chord_segments` (or, with ``earth_model``, a
-    :class:`jaxnu.earth.LayeredEarth` via
-    :func:`jaxnu.earth.layered_chord_segments`) for the geometry -- identical to
+    Reuses :func:`mango.earth.chord_segments` (or, with ``earth_model``, a
+    :class:`mango.earth.LayeredEarth` via
+    :func:`mango.earth.layered_chord_segments`) for the geometry -- identical to
     the standard front-end -- and chains segments in the mass basis (see the
     module docstring). ``nu`` is a :class:`NonUnitarity`; other parameters match
     ``oscillator.probability_earth``. ``alpha -> 0`` reproduces the standard

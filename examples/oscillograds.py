@@ -29,8 +29,8 @@ import numpy as np
 import jax
 import jax.numpy as jnp
 
-import jaxnu
-from jaxnu import OscParams, Flavor, probability_constant, probability_earth
+import mango
+from mango import OscParams, Flavor, probability_constant, probability_earth
 
 OUT = Path(__file__).resolve().parent
 
@@ -172,7 +172,7 @@ print("saved", OUT / "oscillograds_atm.jpg")
 # for mantle-only paths and turn on only where the chord crosses the core
 # (cos theta_z < -0.838, i.e. closest approach below the 3480 km core radius).
 YE_CORE0, YE_MANTLE0 = 0.466, 0.494
-cz_core = -np.sqrt(1.0 - (jaxnu.earth.CORE_RADIUS_KM / jaxnu.earth.R_EARTH_KM) ** 2)
+cz_core = -np.sqrt(1.0 - (mango.earth.CORE_RADIUS_KM / mango.earth.R_EARTH_KM) ** 2)
 
 
 def density_grids(E, cz):
@@ -214,11 +214,11 @@ print(f"max |dP/dYe_core| for core-crossing paths (cz < {cz_core:.3f}): "
 # A fully parametric LayeredEarth makes the shell boundary positions and densities
 # differentiable inputs. We map the sensitivity to the core-mantle boundary radius
 # and to a core shell's mass density.
-model = jaxnu.prem_layered(n_sub=3)
+model = mango.prem_layered(n_sub=3)
 outer_np = np.array(model.outer)
 inner_np = np.concatenate([[0.0], outer_np[:-1]])
-k_cmb = int(np.argmin(np.abs(outer_np - jaxnu.earth.CORE_RADIUS_KM)))  # core-mantle boundary
-core_shells = np.where(inner_np < jaxnu.earth.CORE_RADIUS_KM)[0]
+k_cmb = int(np.argmin(np.abs(outer_np - mango.earth.CORE_RADIUS_KM)))  # core-mantle boundary
+core_shells = np.where(inner_np < mango.earth.CORE_RADIUS_KM)[0]
 k_core = int(core_shells[len(core_shells) // 2])                       # a mid-core shell
 
 

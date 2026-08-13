@@ -13,8 +13,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import jax
 import jax.numpy as jnp
 
-import jaxnu
-from jaxnu import nufit_no, probability_earth, Flavor
+import mango
+from mango import nufit_no, probability_earth, Flavor
 
 p = nufit_no()
 

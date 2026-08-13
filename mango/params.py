@@ -6,7 +6,7 @@ PyTree dataclass so it can be differentiated through directly
 optimizers / samplers.
 
 The framework is intentionally not hard-wired to 3 flavors: the numerical core
-(:mod:`jaxnu.hamiltonian`) consumes a PMNS matrix ``U`` and a mass-squared vector
+(:mod:`mango.hamiltonian`) consumes a PMNS matrix ``U`` and a mass-squared vector
 of *arbitrary* size.  ``OscParams.pmns()`` / ``OscParams.msqared()`` are the
 3-flavor adapters; sterile / NSI extensions provide their own.
 """

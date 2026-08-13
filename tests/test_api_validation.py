@@ -15,7 +15,7 @@ import jax
 import jax.numpy as jnp
 import pytest
 
-from jaxnu import (
+from mango import (
     OscParams,
     NSI,
     NFlavorParams,
@@ -28,8 +28,8 @@ from jaxnu import (
     select,
     solar,
 )
-from jaxnu.sterile import pmns_3plus1
-from jaxnu.oscillator import _is_concrete
+from mango.sterile import pmns_3plus1
+from mango.oscillator import _is_concrete
 
 
 # --- _is_concrete helper -------------------------------------------------

@@ -1,5 +1,5 @@
 """fig_solar_density_sensitivity.py: Core electron density sensitivity d P_ee / d ln N_e(0)
-demonstrating solar structure and metallicity profiling via automatic differentiation in jaxnu.
+demonstrating solar structure and metallicity profiling via automatic differentiation in mango.
 
 Generates a publication-quality standalone figure showing how solar neutrino survival
 probabilities at different production radii (r_emit = 0.04, 0.06, 0.10, 0.18 R_sun) respond
@@ -22,8 +22,8 @@ import jax
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 
-import jaxnu
-from jaxnu import solar, nufit_no, constants as C
+import mango
+from mango import solar, nufit_no, constants as C
 
 # Output directories
 BENCH_OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "output")
@@ -69,13 +69,13 @@ if not FIGONLY or not os.path.exists(NPZ_FILE):
         rho_ye_emit = smooth_rho_ye(r_ratio, n0_scale)
         v_emit = C.matter_potential_eV(rho_ye_emit, 1.0)
 
-        h_emit = jaxnu.hamiltonian.matter_hamiltonian(u, msq, e_eV, v_emit)
+        h_emit = mango.hamiltonian.matter_hamiltonian(u, msq, e_eV, v_emit)
         _, vecs_emit = jnp.linalg.eigh(h_emit)
         w = jnp.abs(vecs_emit[0, :]) ** 2
 
         rho_ye_surf = smooth_rho_ye(1.0, n0_scale)
         v_surf = C.matter_potential_eV(rho_ye_surf, 1.0)
-        h_surf = jaxnu.hamiltonian.matter_hamiltonian(u, msq, e_eV, v_surf)
+        h_surf = mango.hamiltonian.matter_hamiltonian(u, msq, e_eV, v_surf)
         _, vecs_surf = jnp.linalg.eigh(h_surf)
 
         a = jnp.conj(u).T @ vecs_surf

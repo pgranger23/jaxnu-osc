@@ -37,7 +37,7 @@ def propagate_layers(u, msq, energy_eV, v_eV, length_invEV, anti=False,
     v_nc : array_like, shape (n_seg,), optional
         Per-segment sterile-sector potential; defaults to zero (purely active).
     n_active : int, optional
-        Number of active flavors (see :func:`jaxnu.hamiltonian.matter_hamiltonian`).
+        Number of active flavors (see :func:`mango.hamiltonian.matter_hamiltonian`).
     parallel : bool, optional
         Product strategy (see module docstring).  Defaults to ``False`` on CPU and
         ``True`` on GPU/TPU.

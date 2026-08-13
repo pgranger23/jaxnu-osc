@@ -14,7 +14,7 @@ results.
 jaxnu vs OscProb is ~1e-9 — i.e. jaxnu and OscProb share the more precise
 constants).
 
-All comparisons use parameters matching `jaxnu.nufit_no()`
+All comparisons use parameters matching `mango.nufit_no()`
 (s²θ from θ12=0.5836, θ13=0.1495, θ23=0.8587; δ=3.40; Δm²₂₁=7.42e-5;
 Δm²₃₁=2.515e-3 eV²).
 
@@ -119,7 +119,7 @@ at fixed coarse settings.
 ## 3. OscProb (ROOT/Eigen)
 
 OscProb's `PMNS_Fast` (Cayley-Hamilton-free; uses Eigen eigensolvers — a fully
-independent algorithm from jaxnu).
+independent algorithm from mango).
 
 * **Constant density** (`L = 1300`, `rho = 2.85`, `Z/A = 0.5`), three-way at
   E = 2.25 / 4.6875 GeV across ν/ν̄/vacuum channels:

@@ -2,7 +2,7 @@
 
 Reference numbers were produced by compiling and running Peter Denton's NuFast
 codes (https://github.com/PeterDenton) with parameters matching
-``jaxnu.nufit_no()``:
+``mango.nufit_no()``:
 
 * **NuFast-LBL** (constant density), exact mode (``N_Newton = -1``),
   ``L = 1300 km``, ``rhoYe = 1.425``  -> ``probs[alpha][beta] = P(a->b)``.
@@ -20,7 +20,7 @@ for LBL, the matter potential); jaxnu uses first-principles CODATA values.
 import jax.numpy as jnp
 import numpy as np
 
-from jaxnu import nufit_no, probability_constant, probability_earth, earth
+from mango import nufit_no, probability_constant, probability_earth, earth
 
 P = nufit_no()
 

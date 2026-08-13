@@ -5,8 +5,8 @@ import importlib.util
 import jax
 import jax.numpy as jnp
 
-from jaxnu import nufit_no, probability_earth
-from jaxnu.ode import probability_earth_continuous
+from mango import nufit_no, probability_earth
+from mango.ode import probability_earth_continuous
 
 _HAS_DIFFRAX = importlib.util.find_spec("diffrax") is not None
 

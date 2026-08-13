@@ -2,7 +2,7 @@
 
 A self-contained reproduction of the **DUNE TDR oscillation analysis** — far-detector
 event spectra and the CP-violation / mass-ordering sensitivities — built on
-[**jaxnu**](https://github.com/pgranger23/jaxnu-osc) for the (differentiable)
+[**jaxnu**](https://github.com/pgranger23/mango-osc) for the (differentiable)
 oscillation probabilities and DUNE's official GLoBES configuration for everything
 else. The entire forward model is differentiable, and the χ² accepts an arbitrary
 **analysis binning as a matrix `W`** — the intended hook for a binning-optimization
@@ -23,7 +23,7 @@ reference/           DUNE reference figures for comparison
 
 `jaxnu` (the parent package — this script adds the repo root to `sys.path`, or
 `pip install jaxnu`), plus `numpy`, `scipy`, `matplotlib`. Float64 is required and
-enabled automatically by jaxnu.
+enabled automatically by mango.
 
 ```bash
 python run_spectra.py        # four far-detector spectra

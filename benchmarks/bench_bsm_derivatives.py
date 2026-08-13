@@ -28,9 +28,9 @@ import numpy as np
 import jax
 import jax.numpy as jnp
 
-from jaxnu import nufit_no, decoherence, nonunitarity
-from jaxnu.decoherence import Decoherence
-from jaxnu.nonunitarity import NonUnitarity
+from mango import nufit_no, decoherence, nonunitarity
+from mango.decoherence import Decoherence
+from mango.nonunitarity import NonUnitarity
 
 OUTDIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "output")
 os.makedirs(OUTDIR, exist_ok=True)

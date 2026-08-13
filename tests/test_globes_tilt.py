@@ -17,8 +17,8 @@ import jax
 import jax.numpy as jnp
 import pytest
 
-import jaxnu.globes as G
-from jaxnu import nufit_no
+import mango.globes as G
+from mango import nufit_no
 
 GLB = os.path.join(os.path.dirname(__file__), "..", "analyses", "dune",
                    "globes", "DUNE_GLoBES.glb")

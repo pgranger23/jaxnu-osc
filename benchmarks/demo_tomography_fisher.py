@@ -26,7 +26,7 @@ stated event count.
 
 Earth model (default): the density is parametrized by N_ZONES=6 independent
 radial scale factors -- inner core, outer core, lower mantle, transition
-zone, upper mantle, crust -- built on ``jaxnu.earth.LayeredEarth`` (every
+zone, upper mantle, crust -- built on ``mango.earth.LayeredEarth`` (every
 per-shell density is a differentiable input).  This replaces an earlier
 2-parameter (core/mantle) version, which a referee correctly flagged as
 removing the inter-shell degeneracies that dominate a real inversion: with
@@ -60,10 +60,10 @@ import jax
 import jax.numpy as jnp
 import dataclasses
 
-import jaxnu
-import jaxnu.oscillator as _osc
-import jaxnu.earth as _earth
-from jaxnu import constants as C, nufit_no
+import mango
+import mango.oscillator as _osc
+import mango.earth as _earth
+from mango import constants as C, nufit_no
 
 # --- realism toggles (env vars so the old configuration stays reproducible) --
 N_ZONES = int(os.environ.get("N_ZONES", "6"))
@@ -91,7 +91,7 @@ N_BINS = N_E * N_CZ
 
 _P0 = nufit_no()
 
-# --- zoned, fully differentiable Earth (jaxnu.earth.LayeredEarth) ------------
+# --- zoned, fully differentiable Earth (mango.earth.LayeredEarth) ------------
 # n_sub=4 matches the shell count used by the original shell_table(4) (43
 # shells), so the per-bin propagation cost is unchanged; only the number of
 # *free parameters* controlling the shell densities changes.
@@ -346,7 +346,7 @@ def nsi_degeneracy_study():
     free, oscillation tomography constrains the *shape* of the density profile
     but not its overall scale.
     """
-    from jaxnu.nsi import NSI
+    from mango.nsi import NSI
 
     def shape_eps(theta, anti):
         ln_sc = theta[:N_DENS]

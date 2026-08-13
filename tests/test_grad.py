@@ -5,7 +5,7 @@ import dataclasses
 import jax
 import jax.numpy as jnp
 
-from jaxnu import nufit_no, probability_earth, probability_constant, Flavor
+from mango import nufit_no, probability_earth, probability_constant, Flavor
 
 
 def _fd_param(fn, p, field, h):

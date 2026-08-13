@@ -17,15 +17,15 @@ which in the Gaussian limit gives the same answer as *marginalizing* -- i.e.
 ``sqrt(inv(F)_ii)``, not ``1/sqrt(F_ii)``. The fixed-others number is the
 optimistic one, and is never the profiled result.
 
-Works with any parameter PyTree (e.g. :class:`jaxnu.OscParams`, or a dict mixing
+Works with any parameter PyTree (e.g. :class:`mango.OscParams`, or a dict mixing
 oscillation and nuisance parameters) and any model returning a PyTree of
 expected bin counts.
 
 Example
 -------
->>> model = lambda p: {"app": jaxnu.probability_constant(p, E, L, density=2.8,
+>>> model = lambda p: {"app": mango.probability_constant(p, E, L, density=2.8,
 ...                       flavor_in=Flavor.MU, flavor_out=Flavor.E) * flux_template}
->>> F = jaxnu.stat.fisher_matrix(model, params)
+>>> F = mango.stat.fisher_matrix(model, params)
 >>> F = F.with_prior("theta13", 0.002)          # external constraint
 >>> F.sigma("deltacp")                          # marginalized forecast
 >>> F.fixed("dm31").sigma("deltacp")            # with dm31 held fixed

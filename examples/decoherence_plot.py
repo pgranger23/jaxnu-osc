@@ -20,8 +20,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import jax.numpy as jnp
 
-import jaxnu
-from jaxnu import nufit_no, Flavor, Decoherence, WavePacket, decoherence
+import mango
+from mango import nufit_no, Flavor, Decoherence, WavePacket, decoherence
 
 p = nufit_no()
 fig, (a1, a2) = plt.subplots(1, 2, figsize=(12.5, 4.4), dpi=130)
@@ -33,7 +33,7 @@ for gam, color in [(0.0, "k"), (5e-14, "C0"), (2e-13, "C1"), (1e-12, "C3")]:
     d = Decoherence(gamma21=gam, gamma31=gam, gamma32=gam, n=0)
     P = decoherence.probability(p, E, L, d, density=RHO,
                                 flavor_in=Flavor.MU, flavor_out=Flavor.MU)
-    gl = gam * L * jaxnu.constants.KM_TO_INV_EV
+    gl = gam * L * mango.constants.KM_TO_INV_EV
     lab = "standard" if gam == 0 else (
         rf"$\gamma={gam:.0e}$ eV  ($\gamma L\approx{gl:.1f}$)")
     a1.plot(E, np.asarray(P), color=color, lw=1.6, label=lab)

@@ -17,8 +17,8 @@ FIGDIR.mkdir(exist_ok=True)
 DATADIR = ROOT / "examples" / "data"
 
 import jax.numpy as jnp  # noqa: E402
-import jaxnu  # noqa: E402
-from jaxnu import OscParams  # noqa: E402
+import mango  # noqa: E402
+from mango import OscParams  # noqa: E402
 
 DM21 = 7.42e-5
 DM32 = 0.0024428

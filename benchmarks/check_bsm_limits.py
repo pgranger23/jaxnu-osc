@@ -20,7 +20,7 @@ Run from the repo root:
 import numpy as np
 import jax
 import jax.numpy as jnp
-from jaxnu import (NSI, Sterile3plus1, nufit_no, probability_constant,
+from mango import (NSI, Sterile3plus1, nufit_no, probability_constant,
                    probability_vacuum, probability_earth, Flavor)
 
 p = nufit_no()
@@ -92,7 +92,7 @@ print(f"AD vs FD, d/dtheta14 (PREM, 3+1)      : {d5:.2e}")
 print(f"AD vs FD, d/deps_ee (NSI, constant)   : {d6:.2e}")
 
 # --- decoherence and non-unitary mixing (added with the v0.2.0 sectors) ------
-from jaxnu import decoherence as dc, nonunitarity as nu
+from mango import decoherence as dc, nonunitarity as nu
 Egrid = jnp.linspace(0.5, 5.0, 12)
 std = np.asarray(probability_constant(p, Egrid, 1300.0, density=2.8))
 d7 = float(np.abs(np.asarray(dc.probability(p, Egrid, 1300.0, dc.Decoherence(),
@@ -116,7 +116,7 @@ print(f"strongly damped, unitarity preserved  : {d10:.2e}")
 # The failure is NOT a NaN: it is a large finite number that survives isfinite,
 # which is why the paper flags it explicitly. Quantified here so the claim in
 # the scope-and-limitations section is a measured number, not an assertion.
-from jaxnu import Sterile3plus1, probability_vacuum
+from mango import Sterile3plus1, probability_vacuum
 
 _dm31 = float(p.dm31)
 

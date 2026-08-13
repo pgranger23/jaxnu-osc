@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from _common import nuwaves_params, FIGDIR
-from jaxnu import probability_constant, Flavor
+from mango import probability_constant, Flavor
 
 E = np.linspace(0.2, 5.0, 600)
 kw = dict(baseline_km=1300.0, density=2.8, ye=0.5,

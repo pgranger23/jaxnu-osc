@@ -9,7 +9,7 @@ Model: nu_e appearance + nu_mu disappearance spectra in nu and nubar beam modes
 at the DUNE baseline (constant density), Asimov data at NuFIT-4.0-like truth
 with deltacp = -pi/2, Poisson likelihood, Gaussian prior on theta13 (reactor).
 The HMC posterior is compared against the analytic Fisher forecast from
-``jaxnu.stat`` — the two must (and do) agree in the Gaussian regime.
+``mango.stat`` — the two must (and do) agree in the Gaussian regime.
 
 Requires: pip install blackjax
 """
@@ -28,8 +28,8 @@ import jax
 import jax.numpy as jnp
 import blackjax
 
-import jaxnu
-from jaxnu import OscParams, Flavor, probability_constant, stat
+import mango
+from mango import OscParams, Flavor, probability_constant, stat
 
 # --- DUNE-like counting model ------------------------------------------------
 E = jnp.linspace(0.75, 6.0, 40)
@@ -128,7 +128,7 @@ for ax, (a, b) in zip(axs, pairs):
     ax.set_xlabel(a); ax.set_ylabel(b)
     ax.legend(fontsize=8, loc="upper right")
 fig.suptitle("HMC posterior (blackjax NUTS, exact jaxnu gradients) vs the "
-             "analytic Fisher forecast (jaxnu.stat)", fontsize=12)
+             "analytic Fisher forecast (mango.stat)", fontsize=12)
 fig.tight_layout()
 out = Path(__file__).resolve().parent / "hmc_posterior.jpg"
 fig.savefig(out)

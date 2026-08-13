@@ -34,7 +34,7 @@ print("""
   # or the total:  dune.total_spectra(params)
   # build a (differentiable) binning and evaluate / optimize:
   W = dune.rebin_matrix(edges)                 # dW/d(edges) exists
-  chi2, grad = dune.chi2_vg(free, data_tuple, W)   # exact gradient from jaxnu
+  chi2, grad = dune.chi2_vg(free, data_tuple, W)   # exact gradient from mango
   # a Fisher objective for delta_CP:  F = sum_bins (W@dmu/dtheta)(...)^T / (W@mu)
   # then gradient-ascend the sensitivity / Fisher w.r.t. `edges`.
 -------------------------------------------------------------------------------""")

@@ -1,8 +1,8 @@
-"""DUNE CP-violation and mass-ordering sensitivity, reproduced with jaxnu.
+"""DUNE CP-violation and mass-ordering sensitivity, reproduced with mango.
 
 The chi-square is profiled over theta23 (both octants), theta13 (prior), Delta m^2_31,
 delta_CP, the matter density (2% prior) and the 9 GLoBES normalization systematics,
-using the *exact gradient from jaxnu* (jax.value_and_grad -> L-BFGS). 624 kt-MW-yr.
+using the *exact gradient from mango* (jax.value_and_grad -> L-BFGS). 624 kt-MW-yr.
 """
 import time
 import numpy as np

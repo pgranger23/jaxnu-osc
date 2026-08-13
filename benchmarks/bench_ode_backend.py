@@ -5,7 +5,7 @@ which does not exercise this backend. It exists because the backend is shipped
 and was otherwise unquantified, and because it documents a usability trap
 (see (b) below) that is easy to walk into.
 
-The layered path of :mod:`jaxnu.layers` requires the matter profile to be
+The layered path of :mod:`mango.layers` requires the matter profile to be
 piecewise constant. That is exact for PREM, which *is* a shell model, but a
 density given as a smooth function of position -- a supernova profile, a
 fitted/continuous Earth model, an analytic solar profile -- has to be
@@ -51,11 +51,11 @@ import numpy as np
 import jax
 import jax.numpy as jnp
 
-from jaxnu import nufit_no, probability_earth
-from jaxnu import constants as C
-from jaxnu.ode import probability_earth_continuous, propagate_continuous
-import jaxnu.oscillator as _osc
-import jaxnu.earth as earth
+from mango import nufit_no, probability_earth
+from mango import constants as C
+from mango.ode import probability_earth_continuous, propagate_continuous
+import mango.oscillator as _osc
+import mango.earth as earth
 
 OUTDIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "output")
 os.makedirs(OUTDIR, exist_ok=True)

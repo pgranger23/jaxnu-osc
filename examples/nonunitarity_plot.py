@@ -20,7 +20,7 @@ import numpy as np
 import jax
 import jax.numpy as jnp
 
-from jaxnu import nufit_no, Flavor, NonUnitarity, nonunitarity
+from mango import nufit_no, Flavor, NonUnitarity, nonunitarity
 
 p = nufit_no()
 fig, (a1, a2) = plt.subplots(1, 2, figsize=(12.5, 4.4), dpi=130)

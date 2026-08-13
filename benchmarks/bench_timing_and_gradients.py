@@ -26,9 +26,9 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.colors import SymLogNorm
 
-import jaxnu
-import jaxnu.oscillator as _osc
-from jaxnu import nufit_no, probability_constant, probability_earth
+import mango
+import mango.oscillator as _osc
+from mango import nufit_no, probability_constant, probability_earth
 
 OUTDIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "output")
 os.makedirs(OUTDIR, exist_ok=True)
@@ -71,8 +71,8 @@ else:
         rows.append((f"const-density {bk}", timeit(f, E)))
         print(rows[-1], flush=True)
     try:
-        from jaxnu.nufast import prob_matrix as _nufast_prob_matrix
-        from jaxnu import constants as C
+        from mango.nufast import prob_matrix as _nufast_prob_matrix
+        from mango import constants as C
         v_cc, _ = C.matter_potentials(jnp.asarray(2.85), jnp.asarray(0.5))
         L = jnp.asarray(1300.0) * C.KM_TO_INV_EV
         f = jax.jit(lambda e: _nufast_prob_matrix(P, e * C.GEV_TO_EV, L, v_cc))

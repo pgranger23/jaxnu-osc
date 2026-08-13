@@ -2,7 +2,7 @@
 
 import jax.numpy as jnp
 
-from jaxnu import nufit_no, probability_constant, probability_earth
+from mango import nufit_no, probability_constant, probability_earth
 
 
 def _max(a, b):
@@ -31,7 +31,7 @@ def test_nufast_backend_vacuum_anti_and_grad():
     assert _max(probability_constant(p, E, 1300.0, density=2.8, anti=True, backend="nufast"),
                 probability_constant(p, E, 1300.0, density=2.8, anti=True, backend="cayley")) < 1e-10
     # differentiable
-    from jaxnu import Flavor
+    from mango import Flavor
     g = jax.grad(lambda pr: probability_constant(
         pr, jnp.asarray(2.0), 1300.0, density=2.8,
         flavor_in=Flavor.MU, flavor_out=Flavor.E).sum())(p)

@@ -8,7 +8,7 @@ import numpy as np
 import jax
 
 from _common import nuwaves_params, FIGDIR
-from jaxnu import probability_vacuum, Flavor
+from mango import probability_vacuum, Flavor
 
 p = nuwaves_params("NO")
 E = np.linspace(0.2, 5.0, 400)   # GeV

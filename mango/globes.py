@@ -18,7 +18,7 @@ similar modern configs):
   ``copy(%name)``);
 * ``$emin/$emax/$binsize|$bins``, ``$sampling_*`` (defaults to the analysis
   binning), ``$target_mass``;
-* ``$profiletype`` 1 (PREM chord via :mod:`jaxnu.earth`), 2/3 (``$densitytab`` /
+* ``$profiletype`` 1 (PREM chord via :mod:`mango.earth`), 2/3 (``$densitytab`` /
   ``$lengthtab`` layers);
 * ``nuflux`` (``@flux_file/@time/@power/@norm``), ``cross`` (``@cross_file``),
   ``energy`` smearing as explicit migration rows ``{jmin,jmax, v...}`` **or**

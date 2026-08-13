@@ -81,7 +81,7 @@ import jax
 import jax.numpy as jnp
 
 import demo_tomography_fisher as D
-from jaxnu.nsi import NSI
+from mango.nsi import NSI
 
 OUTDIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "output")
 os.makedirs(OUTDIR, exist_ok=True)
